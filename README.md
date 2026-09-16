@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/readme/header.svg" alt="Ternitor, animated: a blank console window opens over the Ternitor settings screen and the bench dims behind it, the Start with Windows switch flips to ON, the console is cut into a frame on the perforated rail, and the counter rolls from 000 to 003" width="920">
+<img src="assets/readme/header.svg" alt="Ternitor, animated: a blank console window opens over the Ternitor settings screen and everything dims behind it, the Start with Windows switch flips to ON, the console disappears, and the hidden counter steps from 000 to 003" width="920">
 
 **Hides the blank console windows Windows opens for other people's processes.**
 One file, no installer, no runtime, no telemetry — and nothing visible once it is running.

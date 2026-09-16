@@ -1,49 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 722 462" width="920" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 722 376" width="920" role="img" aria-labelledby="t d">
   <title id="t">Ternitor, animated</title>
-  <desc id="d">A blank console window opens over the Ternitor settings screen while the switch is still off, and the bench dims behind it. The switch flips to ON, that console is cut into a frame on the perforated rail, and two more arrive behind it — never shown, because Ternitor is running now. The counter steps from 000 to 003.</desc>
+  <desc id="d">A blank console window opens over the Ternitor settings screen while the switch is still off, and everything dims behind it. A beat later the switch flips to ON, the console disappears, and the hidden counter steps from 000 to 003.</desc>
 
   <defs>
     <!-- Film grain. Turbulence rather than thousands of one-pixel rects: same
          tooth, a fraction of the bytes. Two densities, matching the baked
          scatter the app draws at 3% coverage with rare brighter specks. -->
-    <filter id="grain" filterUnits="userSpaceOnUse" x="0" y="0" width="720" height="428" color-interpolation-filters="sRGB">
+    <filter id="grain" filterUnits="userSpaceOnUse" x="0" y="0" width="720" height="344" color-interpolation-filters="sRGB">
       <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="11" stitchTiles="stitch"/>
       <feColorMatrix type="matrix" values="0 0 0 0 0.071  0 0 0 0 0.071  0 0 0 0 0.071  1 0 0 0 -0.78"/>
     </filter>
-    <filter id="dust" filterUnits="userSpaceOnUse" x="0" y="0" width="720" height="428" color-interpolation-filters="sRGB">
+    <filter id="dust" filterUnits="userSpaceOnUse" x="0" y="0" width="720" height="344" color-interpolation-filters="sRGB">
       <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="29" stitchTiles="stitch"/>
       <feColorMatrix type="matrix" values="0 0 0 0 0.173  0 0 0 0 0.173  0 0 0 0 0.173  1 0 0 0 -0.96"/>
     </filter>
 
-    <clipPath id="client"><rect width="720" height="428"/></clipPath>
-    <clipPath id="wheel3"><rect x="636" y="130" width="39" height="58"/></clipPath>
-
-    <!-- One sprocket hole, then the row, then both rows. -->
-    <rect id="h" width="11" height="7" rx="3.5" fill="none" stroke="#2E2E2E"/>
-    <g id="holes">
-      <use href="#h" x="-6"/><use href="#h" x="16"/><use href="#h" x="38"/><use href="#h" x="60"/>
-      <use href="#h" x="82"/><use href="#h" x="104"/><use href="#h" x="126"/><use href="#h" x="148"/>
-      <use href="#h" x="170"/><use href="#h" x="192"/><use href="#h" x="214"/><use href="#h" x="236"/>
-      <use href="#h" x="258"/><use href="#h" x="280"/><use href="#h" x="302"/><use href="#h" x="324"/>
-      <use href="#h" x="346"/><use href="#h" x="368"/><use href="#h" x="390"/><use href="#h" x="412"/>
-      <use href="#h" x="434"/><use href="#h" x="456"/><use href="#h" x="478"/><use href="#h" x="500"/>
-      <use href="#h" x="522"/><use href="#h" x="544"/><use href="#h" x="566"/><use href="#h" x="588"/>
-      <use href="#h" x="610"/><use href="#h" x="632"/><use href="#h" x="654"/><use href="#h" x="676"/>
-      <use href="#h" x="698"/>
-    </g>
-
-    <!-- One frame: a window with a title bar and nothing under it. Drawn at the
-         rightmost cell's origin, so `<use href="#frame" x="656">` puts it exactly
-         where the next hide lands. -->
-    <g id="frame">
-      <rect x="7" y="27" width="44" height="38" fill="none" stroke="#2E2E2E"/>
-      <line x1="10" y1="35" x2="48" y2="35" stroke="#2E2E2E"/>
-    </g>
-
-    <!-- The grease mark is not defined here: each frame carries its own copy, so
-         the mark can be handed from one frame to the next without either one
-         owning it. One 3px stroke and one 1px overshooting it at both ends, so
-         it reads as wax and not as a vector line. -->
+    <clipPath id="client"><rect width="720" height="344"/></clipPath>
+    <clipPath id="wheel3"><rect x="636" y="46" width="39" height="58"/></clipPath>
 
     <!-- The intruder: a blank console. Its edges are brighter than anything the
          plate itself is allowed — structure here never exceeds #2E2E2E — because
@@ -63,179 +36,126 @@
 
   <!-- Window frame. The DWM caption is tinted to the ground, so the OS chrome
        reads as part of the plate. No maximize box: the layout is fixed-size. -->
-  <rect x="0.5" y="0.5" width="721" height="461" rx="8" fill="#000000" stroke="#2E2E2E"/>
+  <rect x="0.5" y="0.5" width="721" height="375" rx="8" fill="#000000" stroke="#2E2E2E"/>
   <text x="14" y="20" font-family="Cascadia Mono, Consolas, monospace" font-size="12" fill="#8A8A8A">Ternitor</text>
   <line x1="664" y1="19" x2="674" y2="19" stroke="#8A8A8A"/>
   <path d="M686 15 l9 9 M695 15 l-9 9" stroke="#8A8A8A" fill="none"/>
 
   <g transform="translate(1,31)" clip-path="url(#client)">
-    <!-- ground, then the rail band, then grain through both -->
-    <rect width="720" height="428" fill="#000000"/>
-    <rect width="720" height="84" fill="#0C0C0C"/>
-    <rect width="720" height="428" filter="url(#grain)"/>
-    <rect width="720" height="428" filter="url(#dust)"/>
-    <use href="#holes" y="8"/>
-    <use href="#holes" y="76"/>
-
-    <!-- the rail's own edges, and a divider between every pair of cells -->
-    <path d="M0 19H720M0 73H720" stroke="#262626"/>
-    <path d="M656 20V72M598 20V72M540 20V72M482 20V72M424 20V72M366 20V72M308 20V72M250 20V72M192 20V72M134 20V72M76 20V72M18 20V72M-40 20V72" stroke="#2E2E2E"/>
+    <!-- ground, then grain through it -->
+    <rect width="720" height="344" fill="#000000"/>
+    <rect width="720" height="344" filter="url(#grain)"/>
+    <rect width="720" height="344" filter="url(#dust)"/>
 
     <!-- head -->
-    <text x="44" y="121" font-family="Franklin Gothic Medium, Segoe UI, sans-serif" font-size="21" fill="#FFFFFF">Ternitor</text>
+    <text x="44" y="37" font-family="Franklin Gothic Medium, Segoe UI, sans-serif" font-size="21" fill="#FFFFFF">Ternitor</text>
     <text font-family="Franklin Gothic Book, Segoe UI, sans-serif" font-size="13.5" fill="#C0C0C0">
-      <tspan x="44" y="153">Hides the blank console windows Windows opens for processes that</tspan>
-      <tspan x="44" y="173">have no console of their own &#8212; hidden the instant they appear,</tspan>
-      <tspan x="44" y="193">so nothing ever flashes on screen.</tspan>
+      <tspan x="44" y="69">Hides the blank console windows Windows opens for processes that</tspan>
+      <tspan x="44" y="89">have no console of their own &#8212; hidden the instant they appear,</tspan>
+      <tspan x="44" y="109">so nothing ever flashes on screen.</tspan>
     </text>
-    <path d="M44 212H676" stroke="#262626"/>
+    <path d="M44 128H676" stroke="#262626"/>
 
     <!-- counter housing and its two static wheels; the third is animated below -->
-    <text x="676" y="117" text-anchor="end" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">HIDDEN THIS SESSION</text>
-    <rect x="550" y="130" width="126" height="58" fill="none" stroke="#2E2E2E"/>
-    <path d="M591.5 130V188M634.5 130V188" stroke="#2E2E2E"/>
-    <text x="570" y="159" text-anchor="middle" dominant-baseline="central" font-family="Cascadia Mono, Consolas, monospace" font-size="34" font-weight="600" fill="#FFFFFF">0</text>
-    <text x="613" y="159" text-anchor="middle" dominant-baseline="central" font-family="Cascadia Mono, Consolas, monospace" font-size="34" font-weight="600" fill="#FFFFFF">0</text>
+    <text x="676" y="33" text-anchor="end" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">HIDDEN THIS SESSION</text>
+    <rect x="550" y="46" width="126" height="58" fill="none" stroke="#2E2E2E"/>
+    <path d="M591.5 46V104M634.5 46V104" stroke="#2E2E2E"/>
+    <text x="570" y="75" text-anchor="middle" dominant-baseline="central" font-family="Cascadia Mono, Consolas, monospace" font-size="34" font-weight="600" fill="#FFFFFF">0</text>
+    <text x="613" y="75" text-anchor="middle" dominant-baseline="central" font-family="Cascadia Mono, Consolas, monospace" font-size="34" font-weight="600" fill="#FFFFFF">0</text>
 
     <!-- fields, left column -->
-    <text x="44" y="237" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">LAST CUT</text>
-    <text x="44" y="258" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#8A8A8A">nothing cut yet</text>
-    <text x="44" y="297" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">STARTED</text>
-    <text x="44" y="314" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">14:07:22</text>
-    <text x="180" y="297" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">ELAPSED</text>
-    <text x="180" y="314" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">1h 42m</text>
+    <text x="44" y="153" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">LAST CUT</text>
+    <text x="44" y="174" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#8A8A8A">nothing cut yet</text>
+    <text x="44" y="213" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">STARTED</text>
+    <text x="44" y="230" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">14:07:22</text>
+    <text x="180" y="213" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">ELAPSED</text>
+    <text x="180" y="230" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">1h 42m</text>
 
     <!-- fields, right column: the switch and its small print -->
-    <text x="452" y="237" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">START WITH WINDOWS</text>
-    <text x="452" y="310" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="12" fill="#C0C0C0">Runs Ternitor when you sign in. Adds one</text>
-    <text x="452" y="327" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="12" fill="#C0C0C0">value to the registry, under HKCU.</text>
+    <text x="452" y="153" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">START WITH WINDOWS</text>
+    <text x="452" y="226" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="12" fill="#C0C0C0">Runs Ternitor when you sign in. Adds one</text>
+    <text x="452" y="243" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="12" fill="#C0C0C0">value to the registry, under HKCU.</text>
 
     <!-- footer -->
-    <path d="M44 368H676" stroke="#262626"/>
-    <text x="44" y="396" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#8A8A8A">v1.0.0  &#183;  windows-x86_64</text>
-    <text x="676" y="396" text-anchor="end" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#8A8A8A">log: ternitor.log</text>
+    <path d="M44 284H676" stroke="#262626"/>
+    <text x="44" y="312" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#8A8A8A">v1.0.0  &#183;  windows-x86_64</text>
+    <text x="676" y="312" text-anchor="end" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#8A8A8A">log: ternitor.log</text>
 
     <!-- ================= everything live, on one 13s loop =================
-         The console is shown exactly once, and only while the switch is still
-         off — that is the annoyance, and it is the reason the switch exists.
-         Every hide after it is invisible, because by then Ternitor is running:
-         the rail lights and the counter steps, and nothing opens on screen.
+         Two beats, deliberately far apart. First the problem: a blank console
+         opens and sits there, alone, with the bench dimmed behind it — nothing
+         else on the surface moves for a second and a half, so there is no
+         chance of reading this as one gesture with what follows. Then the fix:
+         the switch snaps on, and a second later the console is gone and the
+         counter has moved.
 
-         The rail snaps rather than draws. Frames appear whole in the rightmost
-         cell and step left as new ones land, with no slide, no fade and no
-         stroke drawing itself on — the same "state is a mark, there is no
-         animation on the controls" rule the surface itself is built on.
+         The hides after the first are never shown at all, because by then
+         Ternitor is running — which is the whole product. The rail of film
+         frames the app's own settings window carries is not drawn here.
 
          Every number below is seconds into the loop; keyTimes is that over 13.
          The last stretch of each cycle fades the whole live layer out and back
          in, and that gap is where every value resets. -->
     <g id="live">
-      <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.70769;0.73846;0.76154;0.79231;1" dur="13s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.73846;0.76923;0.79231;0.82308;1" dur="13s" repeatCount="indefinite"/>
 
       <!-- LAST CUT: the field empties out and takes the console's title -->
       <g font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">
-        <text x="44" y="258" fill="#8A8A8A">nothing cut yet
-          <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.21538;0.22308;0.70769;0.73846;1" dur="13s" repeatCount="indefinite"/>
+        <text x="44" y="174" fill="#8A8A8A">nothing cut yet
+          <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.27692;0.28462;0.73846;0.76923;1" dur="13s" repeatCount="indefinite"/>
         </text>
-        <text x="44" y="258" opacity="0">C:\WINDOWS\system32\cmd.exe
-          <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.21538;0.22308;0.70769;0.73846;1" dur="13s" repeatCount="indefinite"/>
+        <text x="44" y="174" opacity="0">C:\WINDOWS\system32\cmd.exe
+          <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.27692;0.28462;0.73846;0.76923;1" dur="13s" repeatCount="indefinite"/>
         </text>
       </g>
 
-      <!-- the counter's third wheel, rolling as each hide lands: 2.8s, 4.9s, 7.0s -->
+      <!-- the counter's third wheel, rolling as each hide lands: 3.6s, 5.6s, 7.6s -->
       <g clip-path="url(#wheel3)">
         <g>
           <animateTransform attributeName="transform" type="translate" dur="13s" repeatCount="indefinite"
             values="0 0;0 0;0 -58;0 -58;0 -116;0 -116;0 -174;0 -174;0 0;0 0"
-            keyTimes="0;0.21538;0.23846;0.37692;0.4;0.53846;0.56154;0.73846;0.76154;1"/>
+            keyTimes="0;0.27692;0.3;0.43077;0.45385;0.58462;0.60769;0.73846;0.76923;1"/>
           <g font-family="Cascadia Mono, Consolas, monospace" font-size="34" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">
-            <text x="656" y="159">0</text>
-            <text x="656" y="217">1</text>
-            <text x="656" y="275">2</text>
-            <text x="656" y="333">3</text>
+            <text x="656" y="75">0</text>
+            <text x="656" y="133">1</text>
+            <text x="656" y="191">2</text>
+            <text x="656" y="249">3</text>
           </g>
         </g>
       </g>
 
       <!-- the switch. OFF is an intact strip, ON a punched hole; the flip is a snap -->
       <g>
-        <text x="452" y="237" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">START WITH WINDOWS</text>
+        <text x="452" y="153" font-family="Arial Narrow, Segoe UI, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#8A8A8A">START WITH WINDOWS</text>
         <g>
-          <animate attributeName="opacity" values="1;0;1" keyTimes="0;0.13077;0.79231" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-          <rect x="452" y="248" width="64" height="36" rx="4" fill="#000000" stroke="#C0C0C0"/>
-          <rect x="475" y="257" width="18" height="18" rx="2" fill="none" stroke="#C0C0C0"/>
-          <text x="541" y="266" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#C0C0C0">OFF</text>
+          <animate attributeName="opacity" values="1;0;1" keyTimes="0;0.2;0.82308" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
+          <rect x="452" y="164" width="64" height="36" rx="4" fill="#000000" stroke="#C0C0C0"/>
+          <rect x="475" y="173" width="18" height="18" rx="2" fill="none" stroke="#C0C0C0"/>
+          <text x="541" y="182" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#C0C0C0">OFF</text>
         </g>
         <g opacity="0">
-          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.13077;0.79231" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-          <rect x="452" y="248" width="64" height="36" rx="4" fill="#000000" stroke="#FFFFFF"/>
-          <rect x="475" y="257" width="18" height="18" rx="2" fill="#FFFFFF" stroke="#FFFFFF"/>
-          <line x1="530" y1="275" x2="535" y2="264" stroke="#FF6A13" stroke-width="3"/>
-          <text x="541" y="266" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">ON</text>
+          <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.2;0.82308" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
+          <rect x="452" y="164" width="64" height="36" rx="4" fill="#000000" stroke="#FFFFFF"/>
+          <rect x="475" y="173" width="18" height="18" rx="2" fill="#FFFFFF" stroke="#FFFFFF"/>
+          <line x1="530" y1="191" x2="535" y2="180" stroke="#FF6A13" stroke-width="3"/>
+          <text x="541" y="182" font-family="Cascadia Mono, Consolas, monospace" font-size="12.5" fill="#FFFFFF">ON</text>
         </g>
-      </g>
-
-      <!-- Frame one: appears at 2.8s, steps left at 4.9s and 7.0s. -->
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.21538;0.73846" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-        <g>
-          <animateTransform attributeName="transform" type="translate" dur="13s" repeatCount="indefinite" calcMode="discrete"
-            values="0 0;-58 0;-116 0;0 0" keyTimes="0;0.37692;0.53846;0.76154"/>
-          <use href="#frame" x="656"/>
-          <g opacity="0">
-            <!-- the mark is recency, not state: it is handed on when the next frame lands -->
-            <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.21538;0.37692" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-            <line x1="667" y1="61" x2="703" y2="31" stroke="#FF6A13" stroke-width="3"/>
-            <line x1="663" y1="65" x2="707" y2="27" stroke="#FF6A13" stroke-width="1" opacity="0.9"/>
-          </g>
-        </g>
-      </g>
-
-      <!-- Frame two: appears at 4.9s, steps left at 7.0s. -->
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.37692;0.73846" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-        <g>
-          <animateTransform attributeName="transform" type="translate" dur="13s" repeatCount="indefinite" calcMode="discrete"
-            values="0 0;-58 0;0 0" keyTimes="0;0.53846;0.76154"/>
-          <use href="#frame" x="656"/>
-          <g opacity="0">
-            <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.37692;0.53846" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-            <line x1="667" y1="61" x2="703" y2="31" stroke="#FF6A13" stroke-width="3"/>
-            <line x1="663" y1="65" x2="707" y2="27" stroke="#FF6A13" stroke-width="1" opacity="0.9"/>
-          </g>
-        </g>
-      </g>
-
-      <!-- Frame three: appears at 7.0s and keeps the mark. -->
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.53846;0.73846" calcMode="discrete" dur="13s" repeatCount="indefinite"/>
-        <use href="#frame" x="656"/>
-        <line x1="667" y1="61" x2="703" y2="31" stroke="#FF6A13" stroke-width="3"/>
-        <line x1="663" y1="65" x2="707" y2="27" stroke="#FF6A13" stroke-width="1" opacity="0.9"/>
       </g>
 
       <!-- The scrim, then the intruder. The bench dims while a console is up,
            because a window that steals focus is exactly what this is a picture
            of. Scrim first, console second. -->
       <g>
-        <rect width="720" height="428" fill="#000000" opacity="0">
-          <animate attributeName="opacity" values="0;0;0.45;0.45;0;0" keyTimes="0;0.05385;0.08462;0.21538;0.23846;1" dur="13s" repeatCount="indefinite"/>
+        <rect width="720" height="344" fill="#000000" opacity="0">
+          <animate attributeName="opacity" values="0;0;0.45;0.45;0;0" keyTimes="0;0.05385;0.07692;0.25769;0.27692;1" dur="13s" repeatCount="indefinite"/>
         </rect>
       </g>
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.05385;0.08462;0.21538;0.22308;1" dur="13s" repeatCount="indefinite"/>
+      <g opacity="0" transform="translate(350 190)">
+        <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.04615;0.07692;0.25769;0.27692;1" dur="13s" repeatCount="indefinite"/>
         <g>
-          <!-- Both of these interpolate, so their keyTimes must run to 1 even
-               though the values stop changing before then. Drop the trailing
-               pair and the renderer discards the animation and leaves the
-               console sitting at the origin. -->
-          <animateTransform attributeName="transform" type="translate" dur="13s" repeatCount="indefinite"
-            values="350 215;350 215;685 46;685 46;350 215;350 215" keyTimes="0;0.21538;0.24615;0.73846;0.76154;1"/>
-          <g>
-            <animateTransform attributeName="transform" type="scale" dur="13s" repeatCount="indefinite"
-              values="0.86;0.86;1;1;0.2444;0.2444;0.86;0.86" keyTimes="0;0.05385;0.08462;0.21538;0.24615;0.73846;0.76154;1"/>
-            <use href="#console"/>
-          </g>
+          <animateTransform attributeName="transform" type="scale" dur="13s" repeatCount="indefinite"
+            values="0.86;0.86;1;1;0.9;0.9;0.86;0.86" keyTimes="0;0.04615;0.07692;0.25769;0.27692;0.73846;0.76923;1"/>
+          <use href="#console"/>
         </g>
       </g>
     </g>
