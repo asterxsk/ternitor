@@ -1,0 +1,119 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned the Drafting Plate. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Drafting Plate",
+      "kicker": "THE ROLL",
+      "lineage": "ISO/ASME engineering drawing sheets and plotter output",
+      "thesis": "A settings window that is a drawing of the machine it controls.",
+      "palette": ["#0E1116", "#8FA0AE", "#4FB3C7", "#DC2626"],
+      "materials": ["hairline ink", "measured annotation", "plotter grid", "title block"],
+      "viewport": "A bordered sheet: the mechanism drawn as a live figure upper-left, dimensioned callouts holding the controls, and a title block bottom-right carrying the real hidden count.",
+      "risk": "Reads as decoration the moment the figure stops being driven by real events.",
+      "raised": [
+        { "from": "gameboy-four-shade-field", "raise": "Quantised ink: four values only, no gradient, no shadow, no soft edge anywhere on the sheet." },
+        { "from": "drawcord-cape", "raise": "One pull: enabling Start with Windows re-inks the sheet, turning the startup callout from construction line to committed." },
+        { "from": "iridescent-cloud-edge", "raise": "Confined colour: the plate stays achromatic except one hairline accent and the red strike; colour never fills an area." },
+        { "from": "generative-parametric-identity", "raise": "One seed: every number on the sheet is live app state, so the plate can never show a figure the app does not have." }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Windows 11 Settings Page",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Windows 11 Fluent settings pages",
+      "thesis": "The settings page the OS would have shipped for this, if the OS shipped it.",
+      "palette": ["#202020", "#2C2C2C", "#FFFFFF", "#60CDFF"],
+      "materials": ["Mica backdrop", "Segoe UI Variable", "rounded cards"],
+      "viewport": "A Mica window, one card per setting, the count as a plain row of text.",
+      "risk": "Also the direction most runs in this category land on. Familiar, and it works."
+    },
+    {
+      "id": "challenger-cutting-bench",
+      "label": "Cutting Bench Rail",
+      "verdict": "competitive",
+      "lineage": "film cutting benches and select rails",
+      "thesis": "Hidden windows strung as frames on a rail, each state a mark rather than a colour.",
+      "palette": ["#000000", "#FF6A13", "#FFFFFF"],
+      "materials": ["film grain", "punched perforation", "grease pencil"],
+      "viewport": "A perforated rail crossing the window; frames hang below it in an open bin.",
+      "case": "Fuses cleanly: the janitor's work becomes frames on a rail and state reads as a grease cross or a tape flag. Strong on product clarity, weaker on audience identification for a Windows utility.",
+      "risk": "A rail implies a browsable history the app deliberately does not keep."
+    },
+    {
+      "id": "challenger-one-bit-desktop",
+      "label": "One-Bit Desktop",
+      "verdict": "competitive",
+      "lineage": "early one-bit desktop systems",
+      "thesis": "The settings window as a dithered one-bit panel with hairline chrome.",
+      "palette": ["#000000", "#FFFFFF"],
+      "materials": ["ordered dither", "one-pixel chrome", "marching ants"],
+      "viewport": "A black-and-white panel, the toggle as a dithered switch, the count set in pixel caps.",
+      "case": "Holds audience identification with the desktop tradition it borrows; its window chrome duplicates the OS window it already lives inside.",
+      "risk": "Chrome drawn inside chrome reads as a costume."
+    },
+    {
+      "id": "challenger-gameboy",
+      "label": "Four-Shade Field",
+      "verdict": "declined",
+      "lineage": "four-shade handheld displays",
+      "thesis": "A four-green field where every tone is dithered rather than blended.",
+      "palette": ["#9BBC0F", "#8BAC0F", "#306230", "#0F380F"],
+      "materials": ["8x8 tile grid", "dither"],
+      "case": "Fuses poorly: four greens place a playful handheld world around a utility whose whole value is not being noticed.",
+      "kept": "Strict quantisation. Four values, and dither carrying every tone between them."
+    },
+    {
+      "id": "challenger-cloud-edge",
+      "label": "Iridescent Edge",
+      "verdict": "declined",
+      "lineage": "iridescent cloud optics",
+      "thesis": "An achromatic field with colour confined to a hairline fringe.",
+      "palette": ["#FFFFFF", "#67788A", "#A8E0D0", "#E0A8C8"],
+      "materials": ["hairline bands", "wide margins"],
+      "case": "Fuses poorly: the subject is atmospheric optics, and the product has no optical truth to carry.",
+      "kept": "Confined colour. The field stays achromatic while the accent lives in a hairline."
+    },
+    {
+      "id": "challenger-parametric",
+      "label": "Parametric Identity",
+      "verdict": "declined",
+      "lineage": "generative brand systems",
+      "thesis": "A mark and palette reseeded from live parameters.",
+      "palette": ["#111827", "#2563EB", "#F59E0B"],
+      "materials": ["parametric vector", "derived tokens"],
+      "case": "Fuses poorly: reseeding a palette on a settings screen adds a variable the user did not ask to manage.",
+      "kept": "One seed. Derive every displayed figure from real state rather than composing it by hand."
+    },
+    {
+      "id": "challenger-cape",
+      "label": "Drawcord Cape",
+      "verdict": "declined",
+      "lineage": "drawcord-transforming textiles",
+      "thesis": "A flat plane that one pull gathers into a shaped volume.",
+      "palette": ["#0B0B0C", "#C9A227", "#3A3F45"],
+      "materials": ["matte silk", "channel stitching"],
+      "case": "Fuses poorly: a single transforming control is right for the product, but the material world belongs to fashion, not to a Windows utility.",
+      "kept": "One pull. A single control that visibly reorganises the surface it sits on."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": false
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The dialog Windows itself would have put here: a checkbox, a line of grey text, and an OK button.",
+    "palette": ["#F0F0F0", "#1A1A1A", "#0067C0"],
+    "materials": ["system controls", "grey prose"],
+    "viewport": "A small modal, centred, impossible to criticise and impossible to remember.",
+    "risk": "Indistinguishable from the competition by design."
+  },
+  "steer": true
+}

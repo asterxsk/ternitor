@@ -1,0 +1,9 @@
+# Cargo's build tree. 589 MB of intermediate objects; rebuilt from source.
+/target
+
+# Written at runtime, beside the exe. Per-machine, and it grows.
+/ternitor.log
+
+# Review rasters. The design record they belong to (PROVENANCE.md, DESIGN.md)
+# is versioned; the captures themselves are not.
+/.impeccable/review/*.png

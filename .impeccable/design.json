@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-16T09:55:00Z",
+  "title": "Design System: Ternitor",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Film Base",
+        "canonical": "oklch(0% 0 0)",
+        "tonalRamp": ["#000000", "#0C0C0C", "#121212", "#1A1A1A", "#2C2C2C", "#2E2E2E"],
+        "note": "Pure black. The page is the base, and the base is black in every Windows theme."
+      },
+      "grease": {
+        "role": "primary",
+        "displayName": "Grease Pencil",
+        "canonical": "oklch(68% 0.20 42)",
+        "tonalRamp": ["#FF6A13", "#E85D04", "#C24E04", "#8F3A03"],
+        "note": "Rationed. Exactly two uses: the cut mark on the newest frame, and the tick beside an armed switch. Never a fill, never a state colour."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(100% 0 0)"
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Body Grey",
+        "canonical": "oklch(80% 0 0)",
+        "note": "11.9:1 on the ground. Running copy."
+      },
+      "dim": {
+        "role": "neutral",
+        "displayName": "Label Grey",
+        "canonical": "oklch(62% 0 0)",
+        "note": "6.1:1 on the ground. Small caps labels and the footer."
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Can Label", "purpose": "The app's name, once. Franklin Gothic Medium, stock Windows." },
+      "label": { "displayName": "Edge Printing", "purpose": "Field labels. Arial Narrow Bold, uppercase, tracked 1.4px — the condensed caps that run along a film edge." },
+      "body": { "displayName": "Running Copy", "purpose": "The one paragraph that says what the app does." },
+      "small": { "displayName": "Small Print", "purpose": "The dense explanation under the switch." },
+      "mono": { "displayName": "Data", "purpose": "Counts, window titles, clock times, version. Cascadia Mono." },
+      "counter": { "displayName": "Counter Wheels", "purpose": "The counter digits only, 34px semibold." }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "the-cut",
+        "value": "340ms, 1 - 2^(-10t) exponential ease-out",
+        "purpose": "The single authored motion moment. On a hide, the newest frame's content opens left-to-right (0–45%), then the grease mark follows behind and draws across it (35–100%). One gesture: the film arrives, the hand marks it."
+      },
+      {
+        "name": "no-slide",
+        "value": "0ms",
+        "purpose": "The punch control snaps between states. There is no knob slide, no crossfade. Motion is spent on the figure, nowhere else."
+      },
+      {
+        "name": "animation-budget",
+        "value": "16ms timer, killed at CUT_MS + 40",
+        "purpose": "The repaint timer is stopped the moment the cut lands, so an idle Ternitor consumes no CPU. A second hide restarts it."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "SPI_GETCLIENTAREAANIMATION",
+        "purpose": "When Windows animation is off, the cut lands whole: the frame and its mark appear complete and no timer is started at all."
+      }
+    ],
+    "breakpoints": [
+      { "name": "fixed", "value": "720x428 logical", "note": "No responsive reflow. The window is fixed-size and scales as a whole with the monitor DPI factor (per-monitor v2)." }
+    ],
+    "nativeNotes": {
+      "platform": "windows",
+      "rendering": "Raw Win32 GDI into a double buffer. The static bench — ground, grain, rail, perforations, cell dividers — is baked into one bitmap and rebuilt only when size, scale or theme changes, so a repaint is a blit plus a dozen primitives.",
+      "textRendering": "ANTIALIASED_QUALITY, never ClearType. Subpixel rendering fringes glyphs with orange and blue on a black ground, which on a surface whose only permitted colour is a grease mark reads as a defect.",
+      "caption": "DWMWA_CAPTION_COLOR / BORDER_COLOR tinted to the ground and DWMWA_TEXT_COLOR to ink, so the OS frame reads as part of the plate. Best effort; older builds keep the stock caption."
+    }
+  },
+  "components": [
+    {
+      "name": "Rail",
+      "kind": "custom",
+      "refersTo": "frame-cell",
+      "description": "The perforated strip crossing the window, edge to edge. Sprocket holes above and below, a divider between every 58px cell. Baked into the background.",
+      "html": "<div class=\"ds-rail\"><div class=\"ds-sprockets ds-sprockets-top\"></div><div class=\"ds-cells\"></div><div class=\"ds-sprockets ds-sprockets-bottom\"></div></div>",
+      "css": ".ds-rail { position: relative; height: 84px; background: #0C0C0C; background-image: radial-gradient(circle at 1px 1px, #121212 1px, transparent 0); background-size: 7px 7px; border-top: 1px solid #262626; border-bottom: 1px solid #262626; overflow: hidden; } .ds-sprockets { position: absolute; left: 0; right: 0; height: 7px; background-image: repeating-linear-gradient(to right, transparent 0 11px, transparent 11px 22px); } .ds-cells { position: absolute; inset: 20px 6px 12px 0; right: 6px; left: auto; width: 754px; display: flex; justify-content: flex-end; }"
+    },
+    {
+      "name": "Frame",
+      "kind": "custom",
+      "refersTo": "frame-cell",
+      "description": "One hidden console. A cell 58px wide carrying an inner rectangle inset 7px with a title-bar line 8px below its top and nothing beneath — a window with nothing in it. Unlit frames carry nothing at all.",
+      "html": "<div class=\"ds-frame ds-frame-lit\"><div class=\"ds-window\"></div></div>",
+      "css": ".ds-frame { width: 58px; height: 52px; border-right: 1px solid #2E2E2E; display: flex; align-items: center; justify-content: center; } .ds-window { width: 44px; height: 38px; border: 1px solid #2E2E2E; } .ds-window::before { content: ''; display: block; height: 1px; margin-top: 8px; background: #2E2E2E; }"
+    },
+    {
+      "name": "Counter",
+      "kind": "custom",
+      "refersTo": "counter-wheel",
+      "description": "A mechanical counter's wheels. A bordered housing divided into 40x58 cells, one digit each, zero-padded to at least three. An instrument, not a hero metric. Its label reads HIDDEN THIS SESSION, or PAUSED NOT COUNTING while the tray menu's pause is on — a frozen figure has to say why it is frozen.",
+      "html": "<div class=\"ds-counter\"><span class=\"ds-wheel\">0</span><span class=\"ds-wheel\">0</span><span class=\"ds-wheel\">3</span></div>",
+      "css": ".ds-counter { display: inline-flex; border: 1px solid #2E2E2E; background: #000; } .ds-wheel { width: 40px; height: 58px; display: grid; place-items: center; font: 600 34px/1 'Cascadia Mono', Consolas, monospace; color: #fff; } .ds-wheel + .ds-wheel { border-left: 1px solid #2E2E2E; }"
+    },
+    {
+      "name": "Punch — off",
+      "kind": "button",
+      "refersTo": "start-with-windows-off",
+      "description": "Start with Windows, off. An intact strip: a body-grey outline with a hollow slug inside, and the state word OFF beside it.",
+      "html": "<button class=\"ds-punch ds-punch-off\"><span class=\"ds-slug\"></span></button>",
+      "css": ".ds-punch { width: 64px; height: 36px; border-radius: 4px; background: #000; display: grid; place-items: center; cursor: pointer; } .ds-punch-off { border: 1px solid #C0C0C0; } .ds-slug { width: 18px; height: 18px; border-radius: 2px; border: 1px solid #C0C0C0; }"
+    },
+    {
+      "name": "Punch — on",
+      "kind": "button",
+      "refersTo": "start-with-windows-on",
+      "description": "Start with Windows, armed. A punched hole: the outline lifts to ink and the slug fills solid — the material is removed and light comes through. A grease tick appears in the gap before the state word. An armed switch cannot answer the pointer with a colour, so the slug answers instead: 20px hovered, 16px held, 18px at rest. If the registry write fails the punch stays put and the small print below states the reason and the state it is still in.",
+      "html": "<button class=\"ds-punch ds-punch-on\"><span class=\"ds-slug\"></span></button><svg class=\"ds-tick\"><line x1=\"0\" y1=\"9\" x2=\"5\" y2=\"-2\"/></svg><span class=\"ds-state\">ON</span>",
+      "css": ".ds-punch-on { border: 1px solid #fff; } .ds-punch-on .ds-slug { background: #fff; border-color: #fff; } .ds-tick line { stroke: #FF6A13; stroke-width: 3; stroke-linecap: butt; } .ds-state { font: 400 12.5px/1 'Cascadia Mono', monospace; color: #fff; }"
+    },
+    {
+      "name": "Grease mark",
+      "kind": "custom",
+      "refersTo": "cut-mark",
+      "description": "The cut mark on the newest frame only, drawn as it lands and moving to each new frame. Two strokes — one 3px, one 1px overshooting it at both ends — so it reads as waxy and by hand rather than as a vector line.",
+      "html": "<svg class=\"ds-grease\" viewBox=\"0 0 44 38\"><line class=\"ds-grease-main\" x1=\"4\" y1=\"34\" x2=\"40\" y2=\"4\"/><line class=\"ds-grease-drag\" x1=\"-2\" y1=\"40\" x2=\"46\" y2=\"-2\"/></svg>",
+      "css": ".ds-grease line { stroke: #FF6A13; } .ds-grease-main { stroke-width: 3; } .ds-grease-drag { stroke-width: 1; opacity: 0.9; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Cutting Bench",
+    "overview": "Ternitor hides the blank console windows Windows opens for processes that have no console of their own. It lives in the notification area and does nothing visible; the settings window is the only surface it owns, and it is opened perhaps once. A utility whose value is not being noticed cannot have a surface that performs — so the surface is a film cutting bench: a perforated rail crossing the window, frames hanging in the open bin, a mechanical counter, a grease pencil. It is short, legible in one look, and every element is a real instrument rather than a decoration.\n\nThe figure is the app. Every frame on the rail is blank — a film cell with a title bar and nothing under it — because the window Ternitor hides is by definition a window with nothing in it. The pun is only honest because the count driving it comes straight from the janitor, never from a hand-placed number.\n\nThe surface is black in every Windows theme. A cutting bench is a dark room with a lit viewer, and this design is built around one black ground with ink lifted off it; inverting it would produce a different object rather than the same object in another theme.",
+    "keyCharacteristics": [
+      "One black ground, white ink, and a single rationed orange that always means the operator's hand.",
+      "State expressed as a mark — a punched hole versus an intact strip — so the surface reads correctly in greyscale.",
+      "Instruments instead of decoration: counts in wheels, time as clock readings, windows as film frames.",
+      "No elevation anywhere. Separation is a one-pixel line at one of two weights.",
+      "A rail that runs off both edges of the window: an aperture onto a strip that continues.",
+      "Exactly one authored motion moment, and a repaint timer that stops itself the instant it lands."
+    ],
+    "rules": [
+      {
+        "name": "The Rail Does Not Browse",
+        "body": "Frames enter at the right and leave at the left, and the strip physically discards them. Nothing on the surface is clickable, hoverable or scrollable except the two controls. The app keeps no history, so the design must not imply one; a scrollbar or a per-frame tooltip would promise a record that does not exist.",
+        "section": "layout"
+      },
+      {
+        "name": "Every Frame Is Blank",
+        "body": "The figure is a picture of blank windows, not of windows. Give a frame content and the joke becomes a lie about what the app hides.",
+        "section": "components"
+      },
+      {
+        "name": "Orange Is Grease Pencil",
+        "body": "Orange appears in exactly two places: the cut mark on the newest frame, and the tick beside an armed switch. It is never a fill, a hover state, an error colour, or a background. If two orange marks are on screen at once, one of them is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "State Is A Mark, Not A Colour",
+        "body": "ON is a punched hole; OFF is an intact strip. Read the surface in greyscale and it still works — which is the test for every new element before its colour is considered.",
+        "section": "components"
+      },
+      {
+        "name": "Aperture, Not Container",
+        "body": "The rail runs edge to edge with no end caps. The film continues past the frame we happen to be looking at, and when all thirteen cells are lit the oldest is clipped by the window edge, visibly leaving.",
+        "section": "layout"
+      },
+      {
+        "name": "Cut Is Square, Punched Is Round",
+        "body": "Frame cells, the counter housing, its wheels, the rules and the rail are all square-cornered: cut film and cut metal. Only the sprocket holes and the punch control are rounded, because those are the shapes that are literally punched.",
+        "section": "shapes"
+      },
+      {
+        "name": "No Elevation",
+        "body": "No shadow, gradient, blur or translucency anywhere. Separation is carried entirely by one-pixel lines at two weights and by the single step between ground and band.",
+        "section": "elevation"
+      },
+      {
+        "name": "Greyscale Antialiasing Only",
+        "body": "Text renders with ANTIALIASED_QUALITY, never ClearType. Subpixel rendering fringes every glyph with orange and blue on a black ground, and on a surface whose single permitted colour is a grease mark that reads as a bug.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do drive every number on the surface from live state; the failure mode is a figure that keeps showing something the app no longer has.",
+      "Do put each fact in the instrument that fits it: counts in wheels, states as marks, time as clock readings, windows as frames.",
+      "Do keep orange to one mark at a time.",
+      "Do snap every measurement through the single px() helper, hairlines and type included.",
+      "Do check that a new element reads in greyscale before checking it in colour."
+    ],
+    "donts": [
+      "Don't add a scrollbar, a hover tooltip, a per-frame click target, or anything else that turns the rail into a browsable history.",
+      "Don't use orange as a background, a fill, an error state, or a hover state.",
+      "Don't add elevation, a card, a gradient, or a soft edge. Separation is a line.",
+      "Don't render text with ClearType, and don't add a font that isn't stock Windows.",
+      "Don't add a light theme without redrawing the object; inverting the palette produces a film strip on white paper, which is a different thing.",
+      "Don't let the surface grow. If a setting is added, something else comes off."
+    ]
+  }
+}
