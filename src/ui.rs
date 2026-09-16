@@ -3,12 +3,11 @@
 //! What it draws is described in DESIGN.md; this module is only how. Three things
 //! about the how are load-bearing:
 //!
-//! - **Two buffers.** Everything static -- ground, grain, rail, perforations, cell
-//!   dividers -- is baked into one bitmap and rebuilt only when the client size or
-//!   the display scale changes. Each paint blits that bitmap into a second buffer,
-//!   draws the live parts over it, and blits the result to the screen. So a repaint
-//!   is a blit plus a dozen primitives, which is what lets the cut animate without
-//!   the app ever showing up in Task Manager.
+//! - **Two buffers.** Everything static -- ground and grain -- is baked into one
+//!   bitmap and rebuilt only when the client size or the display scale changes.
+//!   Each paint blits that bitmap into a second buffer, draws the live parts over
+//!   it, and blits the result to the screen. So a repaint is a blit plus a dozen
+//!   primitives.
 //! - **One thread.** The window, the tray icon and the window-event hook all live
 //!   on the main thread (see `app`), so `UI` is a plain thread-local with no locks
 //!   and the hook callback can invalidate the window directly.
@@ -16,9 +15,12 @@
 //!   ever shown or hidden. Closing it returns to the tray rather than quitting;
 //!   the tray menu owns quitting.
 //!
-//! `notify_activity` is called from inside the janitor's callback, which runs
-//! while `app::App` is mutably borrowed. It therefore touches nothing but `UI`,
-//! and reads the app snapshot only later, during `WM_PAINT`.
+//! Nothing here moves. A hide changes the count, the janitor asks for a repaint,
+//! and the new figure is simply there -- there is no transition to run and no
+//! timer to run it on, so an idle Ternitor has nothing to spend CPU on. `refresh`
+//! is called from inside the janitor's callback, which runs while `app::App` is
+//! mutably borrowed; it therefore touches nothing but `UI` and reads the app
+//! snapshot only later, during `WM_PAINT`.
 
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
@@ -42,12 +44,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DefWindowProcW, DestroyWindow,
-    GetClientRect, GetCursorPos, IDC_ARROW, IDC_HAND, IsWindowVisible, KillTimer, LoadCursorW,
-    MINMAXINFO, RegisterClassW, SetCursor, SetForegroundWindow, SetTimer, SetWindowPos, ShowWindow,
-    SW_HIDE, SW_SHOWNORMAL, SWP_NOACTIVATE, SWP_NOZORDER, WM_ACTIVATE, WM_CLOSE, WM_DESTROY,
-    WM_DPICHANGED, WM_ERASEBKGND, WM_GETMINMAXINFO, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
-    WM_MOUSEMOVE, WM_PAINT, WM_SETFOCUS, WM_SETCURSOR, WM_TIMER, WNDCLASSW, WINDOW_EX_STYLE,
-    WINDOW_STYLE, WS_CAPTION, WS_MINIMIZEBOX, WS_SYSMENU,
+    GetClientRect, GetCursorPos, IDC_ARROW, IDC_HAND, LoadCursorW, MINMAXINFO, RegisterClassW,
+    SetCursor, SetForegroundWindow, SetWindowPos, ShowWindow, SW_HIDE, SW_SHOWNORMAL,
+    SWP_NOACTIVATE, SWP_NOZORDER, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND,
+    WM_GETMINMAXINFO, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_SETFOCUS,
+    WM_SETCURSOR, WNDCLASSW, WINDOW_EX_STYLE, WINDOW_STYLE, WS_CAPTION, WS_MINIMIZEBOX, WS_SYSMENU,
 };
 
 use crate::app::{self, Snapshot};
@@ -63,18 +64,8 @@ const WM_MOUSELEAVE: u32 = 0x02A3;
 // Logical pixels at 96dpi. Everything scales through `theme::px`.
 
 const W: i32 = 720;
-const H: i32 = 428;
+const H: i32 = 344;
 const PAD: i32 = 44;
-
-/// The rail: band height, and the frame cell that hangs in it.
-const STRIP_H: i32 = 84;
-const CELL_W: i32 = 58;
-const CELL_EDGE: i32 = 6;
-const CELL_TOP: i32 = 20;
-const CELL_BOTTOM: i32 = 72;
-/// Slots across the strip. The last one is clipped by the window edge, which is
-/// the point: when they are all lit, the oldest frame is visibly leaving.
-const CELLS: i32 = 13;
 
 /// The counter's wheels.
 const DIGIT_W: i32 = 40;
@@ -83,14 +74,9 @@ const DIGIT_H: i32 = 58;
 
 /// The autostart punch.
 const PUNCH_X: i32 = 452;
-const PUNCH_Y: i32 = 248;
+const PUNCH_Y: i32 = 164;
 const PUNCH_W: i32 = 64;
 const PUNCH_H: i32 = 36;
-
-/// How long the cut takes, start to finish.
-const CUT_MS: u64 = 340;
-const FRAME_MS: u32 = 16;
-const TIMER_ID: usize = 1;
 
 // ------------------------------------------------------------------ state ---
 
@@ -130,9 +116,6 @@ impl Drop for Buf {
 
 struct Ui {
     hwnd: HWND,
-    /// When the most recent cut landed, while it is still being drawn.
-    pulse: Option<Instant>,
-    ticking: bool,
     hover: bool,
     focus: bool,
     pressed: bool,
@@ -141,7 +124,7 @@ struct Ui {
     autostart_error: Option<String>,
     scale: f32,
     fonts: Option<Fonts>,
-    /// Ground, grain, rail and perforations, baked. Kept between paints.
+    /// Ground and grain, baked. Kept between paints.
     ground: Option<Buf>,
     /// What gets composed and blitted each paint.
     buf: Option<Buf>,
@@ -151,8 +134,6 @@ impl Ui {
     fn new() -> Ui {
         Ui {
             hwnd: HWND::default(),
-            pulse: None,
-            ticking: false,
             hover: false,
             focus: false,
             pressed: false,
@@ -336,8 +317,8 @@ fn to_utf16(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }
 
-/// Ground, grain, dust, the rail, its perforations and the cell dividers. All
-/// static, so it is drawn once per size and theme rather than once per frame.
+/// Ground, grain and dust. All static, so it is drawn once per size and theme
+/// rather than once per paint.
 fn bake_ground(p: &Painter, pal: &Palette) {
     let full = RECT {
         left: 0,
@@ -346,48 +327,7 @@ fn bake_ground(p: &Painter, pal: &Palette) {
         bottom: p.d(H as f32),
     };
     p.fill(full, pal.ground);
-    p.fill(
-        RECT {
-            bottom: p.d(STRIP_H as f32),
-            ..full
-        },
-        pal.band,
-    );
-    // Grain over ground and rail alike: the whole bench is film, so the tooth
-    // runs through both. Only the punched holes stay clean.
     grain(p, pal, p.d(W as f32), p.d(H as f32));
-
-    // Perforations, two rows, running off both edges.
-    let hole_w = p.d(11.0);
-    let hole_h = p.d(7.0);
-    let pitch = p.d(22.0);
-    let mut x = -p.d(6.0);
-    while x < p.d(W as f32) {
-        for top in [p.d(8.0), p.d(77.0)] {
-            p.round(
-                RECT {
-                    left: x,
-                    top,
-                    right: x + hole_w,
-                    bottom: top + hole_h,
-                },
-                p.d(4.0),
-                pal.edge,
-                Some(pal.ground),
-            );
-        }
-        x += pitch;
-    }
-
-    // The rail's own edges, and a divider between every pair of cells.
-    let top = p.d(CELL_TOP as f32 - 1.0);
-    let bottom = p.d(CELL_BOTTOM as f32 + 1.0);
-    p.line(0, top, p.d(W as f32), top, pal.rule, 1);
-    p.line(0, bottom, p.d(W as f32), bottom, pal.rule, 1);
-    for j in 1..=CELLS {
-        let x = p.d((W - CELL_EDGE) as f32) - j * p.d(CELL_W as f32);
-        p.line(x, p.d(CELL_TOP as f32), x, p.d(CELL_BOTTOM as f32), pal.edge, 1);
-    }
 }
 
 /// Film grain and the occasional dust speck, deterministic in (x, y) so the bench
@@ -438,97 +378,14 @@ fn scatter(x: i32, y: i32, salt: u32) -> u32 {
     h ^ (h >> 13)
 }
 
-/// A cut mark: the operator's hand across a frame. Two strokes, the longer one
-/// thin and overshooting, so it reads as waxy and drawn rather than as a vector.
+/// The operator's tick: the grease pencil beside an armed switch. Two strokes,
+/// the longer one thin and overshooting, so it reads as waxy and drawn rather
+/// than as a vector.
 fn grease(p: &Painter, x1: i32, y1: i32, x2: i32, y2: i32, colour: Rgb) {
     p.line(x1, y1, x2, y2, colour, p.d(3.0).max(2));
     let dx = (x2 - x1) / 6;
     let dy = (y2 - y1) / 6;
     p.line(x1 - dx, y1 - dy, x2 + dx, y2 + dy, colour, 1);
-}
-
-/// Exponential ease-out: fast out of the gate, settling onto the mark.
-fn ease(t: f64) -> f64 {
-    if t >= 1.0 {
-        1.0
-    } else {
-        1.0 - (2.0f64).powf(-10.0 * t)
-    }
-}
-
-fn draw_frames(p: &Painter, pal: &Palette, snap: &Snapshot, ui: &Ui) {
-    let lit = snap.hidden.min(CELLS as u64) as i32;
-    let right = p.d((W - CELL_EDGE) as f32);
-    let step = p.d(CELL_W as f32);
-
-    for slot in 0..lit {
-        let r = right - slot * step;
-        let cell = RECT {
-            left: r - step,
-            top: p.d(CELL_TOP as f32),
-            right: r,
-            bottom: p.d(CELL_BOTTOM as f32),
-        };
-        let newest = slot == 0;
-
-        // The cut is drawn as it lands: the frame's content opens left to right,
-        // then the hand follows behind it. One gesture, one easing.
-        let (opened, slash) = if newest && snap.hidden > 0 {
-            match ui.pulse {
-                Some(t0) => {
-                    let t = (t0.elapsed().as_millis() as f64 / CUT_MS as f64).min(1.0);
-                    (ease((t / 0.45).min(1.0)), ((t - 0.35) / 0.65).clamp(0.0, 1.0))
-                }
-                None => (1.0, 1.0),
-            }
-        } else {
-            (1.0, 0.0)
-        };
-
-        let inner = RECT {
-            left: cell.left + p.d(7.0),
-            top: cell.top + p.d(7.0),
-            right: cell.right - p.d(7.0),
-            bottom: cell.bottom - p.d(7.0),
-        };
-        let open_to = inner.left + ((inner.right - inner.left) as f64 * opened) as i32;
-        if open_to > inner.left {
-            // A window with a title bar and nothing under it.
-            let bar = p.d(8.0).max(3);
-            p.frame(
-                RECT {
-                    left: inner.left,
-                    top: inner.top,
-                    right: open_to,
-                    bottom: inner.bottom,
-                },
-                pal.edge,
-            );
-            if open_to > inner.left + bar {
-                p.line(
-                    inner.left + p.d(3.0),
-                    inner.top + bar,
-                    open_to - p.d(3.0),
-                    inner.top + bar,
-                    pal.edge,
-                    1,
-                );
-            }
-        }
-
-        if slash > 0.0 {
-            let (ax, ay) = (inner.left + p.d(4.0), inner.bottom - p.d(4.0));
-            let (bx, by) = (inner.right - p.d(4.0), inner.top + p.d(4.0));
-            grease(
-                p,
-                ax,
-                ay,
-                ax + ((bx - ax) as f64 * slash) as i32,
-                ay + ((by - ay) as f64 * slash) as i32,
-                pal.accent,
-            );
-        }
-    }
 }
 
 /// A mechanical counter's wheels, zero-padded to at least three and growing as
@@ -546,7 +403,7 @@ fn draw_counter(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts) {
     let n = digits.len() as i32;
     let dw = p.d(DIGIT_W as f32);
     let gap = p.d(DIGIT_GAP as f32);
-    let top = p.d(130.0);
+    let top = p.d(46.0);
     let bottom = top + p.d(DIGIT_H as f32);
 
     // Paused, the wheels stop turning. A figure that keeps showing something the
@@ -557,7 +414,7 @@ fn draw_counter(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts) {
         p.text(
             "PAUSED",
             right - w,
-            p.d(108.0),
+            p.d(24.0),
             fonts.label,
             pal.body,
             theme::LABEL_TRACKING,
@@ -565,7 +422,7 @@ fn draw_counter(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts) {
         p.text_right(
             "NOT COUNTING",
             right - w - p.d(12.0),
-            p.d(108.0),
+            p.d(24.0),
             fonts.label,
             pal.dim,
             theme::LABEL_TRACKING,
@@ -574,7 +431,7 @@ fn draw_counter(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts) {
         p.text_right(
             "HIDDEN THIS SESSION",
             right,
-            p.d(108.0),
+            p.d(24.0),
             fonts.label,
             pal.dim,
             theme::LABEL_TRACKING,
@@ -617,7 +474,7 @@ fn draw_autostart(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui
     p.text(
         "START WITH WINDOWS",
         p.d(PUNCH_X as f32),
-        p.d(228.0),
+        p.d(144.0),
         fonts.label,
         pal.dim,
         theme::LABEL_TRACKING,
@@ -702,7 +559,7 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
     let left = p.d(PAD as f32);
     let right = p.d((W - PAD) as f32);
 
-    p.text("Ternitor", left, p.d(104.0), fonts.title, pal.ink, 0.0);
+    p.text("Ternitor", left, p.d(20.0), fonts.title, pal.ink, 0.0);
     for (i, line) in [
         "Hides the blank console windows Windows opens for processes that",
         "have no console of their own \u{2014} hidden the instant they appear,",
@@ -715,14 +572,14 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
         // metrics: if the face ever substitutes for a wider one, the line
         // ellipsizes rather than growing into the right column.
         let shown = p.fit(line, p.d(430.0), fonts.body, 0.0);
-        p.text(&shown, left, p.d(142.0 + 20.0 * i as f32), fonts.body, pal.body, 0.0);
+        p.text(&shown, left, p.d(58.0 + 20.0 * i as f32), fonts.body, pal.body, 0.0);
     }
 
-    p.hrule(p.d(212.0), pal.rule);
+    p.hrule(p.d(128.0), pal.rule);
 
-    p.text("LAST CUT", left, p.d(228.0), fonts.label, pal.dim, theme::LABEL_TRACKING);
+    p.text("LAST CUT", left, p.d(144.0), fonts.label, pal.dim, theme::LABEL_TRACKING);
     if snap.hidden == 0 {
-        p.text("nothing cut yet", left, p.d(248.0), fonts.mono, pal.dim, 0.0);
+        p.text("nothing cut yet", left, p.d(164.0), fonts.mono, pal.dim, 0.0);
     } else {
         let title = if snap.last_title.is_empty() {
             "an untitled console"
@@ -730,7 +587,7 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
             snap.last_title.as_str()
         };
         let shown = p.fit(title, p.d(376.0), fonts.mono, 0.0);
-        p.text(&shown, left, p.d(248.0), fonts.mono, pal.ink, 0.0);
+        p.text(&shown, left, p.d(164.0), fonts.mono, pal.ink, 0.0);
     }
 
     for (dx, label, value) in [
@@ -740,12 +597,12 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
         p.text(
             label,
             left + p.d(dx),
-            p.d(288.0),
+            p.d(204.0),
             fonts.label,
             pal.dim,
             theme::LABEL_TRACKING,
         );
-        p.text(&value, left + p.d(dx), p.d(304.0), fonts.mono, pal.ink, 0.0);
+        p.text(&value, left + p.d(dx), p.d(220.0), fonts.mono, pal.ink, 0.0);
     }
 
     draw_counter(p, pal, snap, fonts);
@@ -763,11 +620,11 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
                 fonts.small,
                 0.0,
             );
-            p.text(&line, x, p.d(300.0), fonts.small, pal.ink, 0.0);
+            p.text(&line, x, p.d(216.0), fonts.small, pal.ink, 0.0);
             p.text(
                 &format!("Ternitor is still {}.", if snap.autostart { "ON" } else { "OFF" }),
                 x,
-                p.d(317.0),
+                p.d(233.0),
                 fonts.small,
                 pal.body,
                 0.0,
@@ -781,12 +638,12 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
             .iter()
             .enumerate()
             {
-                p.text(line, x, p.d(300.0 + 17.0 * i as f32), fonts.small, pal.body, 0.0);
+                p.text(line, x, p.d(216.0 + 17.0 * i as f32), fonts.small, pal.body, 0.0);
             }
         }
     }
 
-    p.hrule(p.d(368.0), pal.rule);
+    p.hrule(p.d(284.0), pal.rule);
 
     let info = format!(
         "v{}  \u{00B7}  {}-{}",
@@ -794,8 +651,8 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
         std::env::consts::OS,
         std::env::consts::ARCH
     );
-    p.text(&info, left, p.d(386.0), fonts.mono, pal.dim, 0.0);
-    p.text_right("log: ternitor.log", right, p.d(386.0), fonts.mono, pal.dim, 0.0);
+    p.text(&info, left, p.d(302.0), fonts.mono, pal.dim, 0.0);
+    p.text_right("log: ternitor.log", right, p.d(302.0), fonts.mono, pal.dim, 0.0);
 }
 
 fn span(d: Duration) -> String {
@@ -871,7 +728,6 @@ fn paint(hwnd: HWND) {
             hdc: buf.dc,
             s: ui.scale,
         };
-        draw_frames(&p, &pal, &snap, ui);
         draw_sheet(&p, &pal, &snap, fonts, ui);
 
         unsafe {
@@ -904,23 +760,6 @@ fn toggle() {
     redraw(hwnd);
 }
 
-/// Keep asking for repaints while a cut is being drawn, and stop the moment it is
-/// done so that an idle Ternitor costs nothing.
-fn tick(hwnd: HWND) {
-    let finished = with_ui(|ui| match ui.pulse {
-        Some(t0) if t0.elapsed().as_millis() as u64 >= CUT_MS + 40 => {
-            ui.pulse = None;
-            true
-        }
-        None => true,
-        _ => false,
-    });
-    if finished && with_ui(|ui| std::mem::replace(&mut ui.ticking, false)) {
-        unsafe { let _ = KillTimer(Some(hwnd), TIMER_ID); }
-    }
-    unsafe { let _ = InvalidateRect(Some(hwnd), None, false); }
-}
-
 fn redraw(hwnd: HWND) {
     unsafe { let _ = InvalidateRect(Some(hwnd), None, false); }
 }
@@ -938,10 +777,6 @@ unsafe extern "system" fn sheet_proc(
         }
         // Everything is painted; there is no background to erase.
         WM_ERASEBKGND => LRESULT(1),
-        WM_TIMER => {
-            tick(hwnd);
-            LRESULT(0)
-        }
         // One screen, one size. Pinning the track sizes to the size we were built
         // for means the layout can never be asked to paint a client it has no
         // metrics for -- not by the resize border, not by snap, not by Win+Up.
@@ -1162,31 +997,13 @@ pub fn open() {
     }
 }
 
-/// State changed without a window being hidden -- a setting, or the pause from
-/// the tray. Repaint, but do not spend the cut mark: that gesture means one
-/// thing, and it is not "a checkbox moved".
+/// Something changed -- a hide landed, a setting moved, the pause came off the
+/// tray. Repaint. Nothing animates, so this is the whole of the update.
 pub fn refresh() {
     with_ui(|ui| {
         if !ui.hwnd.is_invalid() {
             unsafe { let _ = InvalidateRect(Some(ui.hwnd), None, false); }
         }
-    });
-}
-
-/// Something changed. Start the cut mark, but only if anyone is watching.
-pub fn notify_activity() {
-    with_ui(|ui| {
-        if ui.hwnd.is_invalid() || !unsafe { IsWindowVisible(ui.hwnd).as_bool() } {
-            return;
-        }
-        if theme::animations_enabled() {
-            ui.pulse = Some(Instant::now());
-            if !ui.ticking {
-                ui.ticking = true;
-                unsafe { SetTimer(Some(ui.hwnd), TIMER_ID, FRAME_MS, None) };
-            }
-        }
-        unsafe { let _ = InvalidateRect(Some(ui.hwnd), None, false); }
     });
 }
 

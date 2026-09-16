@@ -78,7 +78,7 @@ impl App {
         if let janitor::Event::Hidden { title } = ev {
             self.last_title = title;
         }
-        ui::notify_activity();
+        ui::refresh();
     }
 
     pub fn toggle_pause(&mut self) {
@@ -92,7 +92,7 @@ impl App {
     }
 
     /// Returns the reason it did not take, for the surface to show. The window is
-    /// only repainted -- a setting is not a cut, and the cut mark means one thing.
+    /// only repainted -- nothing animates, so a repaint is the whole update.
     pub fn set_autostart(&mut self, on: bool) -> Result<(), String> {
         let r = autostart::set(on);
         match &r {

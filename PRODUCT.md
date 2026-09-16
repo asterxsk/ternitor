@@ -82,8 +82,9 @@ consoles, so nothing is hiding its own at boot.
   the Rust build.
 - Measurements on this machine. PowerShell version: 160 MB working set, 72 MB
   private bytes, 986 ms start, 0 ms idle CPU over 5 s. Rust build: 17.4 MB working
-  set, 2.8 MB private, ~10 ms start, 0.06 s CPU, and 0% idle CPU -- the repaint
-  timer stops itself the moment the cut animation lands.
+  set, 2.8 MB private, ~10 ms start, 0.06 s CPU, and 0% idle CPU -- the surface
+  does not animate and runs no repaint timer, so an idle Ternitor has nothing to
+  spend CPU on at all.
 
 ## Product Principles
 

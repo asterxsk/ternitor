@@ -9,7 +9,7 @@ One file, no installer, no runtime, no telemetry — and nothing visible once it
 [![Platform](https://img.shields.io/badge/platform-windows%2011-58a6ff?style=flat-square)](#requirements)
 [![Rust](https://img.shields.io/badge/rust-2021-d29922?style=flat-square&logo=rust&logoColor=white)](#build-it)
 [![Telemetry](https://img.shields.io/badge/telemetry-none-7ee787?style=flat-square)](#privacy)
-[![Size](https://img.shields.io/badge/size-176%20KB-8b949e?style=flat-square)](#files)
+[![Size](https://img.shields.io/badge/size-174%20KB-8b949e?style=flat-square)](#files)
 
 </div>
 
@@ -90,14 +90,14 @@ windows hidden this session, and app info.
 Everything else stays on the tray menu, because a utility whose value is *not being noticed* should
 not grow a control panel.
 
-What it looks like is documented in [DESIGN.md](DESIGN.md). The surface is a film cutting bench — a
-perforated rail of blank frames, a mechanical counter, a grease pencil — and every frame on it is
-blank, because the window it is counting is by definition a window with nothing in it.
+What it looks like is documented in [DESIGN.md](DESIGN.md). The surface is a bench instrument panel —
+a mechanical counter, a punched switch, a grease pencil — and the counter is the only number on it,
+because the count is the whole of what Ternitor produces.
 
 ## Requirements
 
 - **Windows 11, x64.** No runtime, no redistributable, no Node, no PowerShell.
-- **176 KB.** One exe. Nothing is installed and nothing is written outside its own folder and one
+- **174 KB.** One exe. Nothing is installed and nothing is written outside its own folder and one
   registry value you can see and delete.
 - **Nothing at startup.** The build is a GUI-subsystem binary (PE subsystem 2), so it can never
   allocate a console — which is what stops it flashing one of its own at logon. An earlier scripting
@@ -149,5 +149,5 @@ points at the copy you kept.
 MIT. See [LICENSE](LICENSE).
 
 <div align="center">
-<sub>Every frame on the rail is blank. That is the point.</sub>
+<sub>The counter is the only thing it ever shows you. That is the point.</sub>
 </div>

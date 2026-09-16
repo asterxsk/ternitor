@@ -90,8 +90,8 @@
          counter has moved.
 
          The hides after the first are never shown at all, because by then
-         Ternitor is running — which is the whole product. The rail of film
-         frames the app's own settings window carries is not drawn here.
+         Ternitor is running — which is the whole product, and the counter is the
+         whole of what it shows you.
 
          Every number below is seconds into the loop; keyTimes is that over 13.
          The last stretch of each cycle fades the whole live layer out and back

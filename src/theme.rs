@@ -1,10 +1,9 @@
-//! Palette, type and metrics for the cutting-bench sheet.
+//! Palette, type and metrics for the bench sheet.
 //!
-//! The world is a film cutting bench: black base, white ink, one perforated rail
-//! and a grease pencil. Three colours and no others -- the ground, the ink, and
-//! the orange the operator marks with. Everything between them is film grey, and
-//! nothing on the surface is a colour: state is a mark (a punched hole, a
-//! slashed frame), never a hue.
+//! The world is a bench instrument panel: black base, white ink, a grease pencil.
+//! Three colours and no others -- the ground, the ink, and the orange the operator
+//! marks with. Everything between them is film grey, and nothing on the surface is
+//! a colour: state is a mark (a punched hole, an intact strip), never a hue.
 //!
 //! The bench is black in every Windows theme; see `PALETTE` for why there is no
 //! light variant.
@@ -27,13 +26,11 @@ const fn rgb(r: u8, g: u8, b: u8) -> Rgb {
 pub struct Palette {
     /// Film base. The whole ground.
     pub ground: Rgb,
-    /// The rail the strip runs over, a shade above the base.
-    pub band: Rgb,
     /// Grain. One value, scattered, never blended.
     pub speck: Rgb,
     /// Dust and hairs on the print: the few specks that catch light.
     pub dust: Rgb,
-    /// One-pixel structure: frame edges, perforation outlines.
+    /// One-pixel structure: the counter housing and its wheel dividers.
     pub edge: Rgb,
     /// Section rules.
     pub rule: Rgb,
@@ -58,7 +55,6 @@ pub struct Palette {
 /// is tinted to match.
 pub const PALETTE: Palette = Palette {
     ground: rgb(0x00, 0x00, 0x00),
-    band: rgb(0x0C, 0x0C, 0x0C),
     speck: rgb(0x12, 0x12, 0x12),
     dust: rgb(0x2C, 0x2C, 0x2C),
     edge: rgb(0x2E, 0x2E, 0x2E),
@@ -68,25 +64,6 @@ pub const PALETTE: Palette = Palette {
     ink: rgb(0xFF, 0xFF, 0xFF),
     accent: rgb(0xFF, 0x6A, 0x13),
 };
-
-/// Whether Windows is allowed to animate. When it is not, the cut lands whole
-/// instead of being drawn.
-pub fn animations_enabled() -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
-    };
-
-    let mut on = windows::core::BOOL(1);
-    let ok = unsafe {
-        SystemParametersInfoW(
-            SPI_GETCLIENTAREAANIMATION,
-            0,
-            Some(&mut on as *mut windows::core::BOOL as *mut _),
-            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-        )
-    };
-    ok.is_ok() && on.as_bool()
-}
 
 /// The scale factor for a window's monitor, as a multiplier on 96dpi metrics.
 /// Hairlines and type both scale with it, so the bench is the same bench at any
@@ -121,7 +98,7 @@ pub struct Fonts {
     pub body: HFONT,
     /// The dense small print under a control.
     pub small: HFONT,
-    /// Frame count and window titles: data, so the terminal face.
+    /// Hidden count and window titles: data, so the terminal face.
     pub mono: HFONT,
     /// The counter's wheels.
     pub counter: HFONT,
