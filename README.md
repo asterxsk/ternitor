@@ -3,13 +3,13 @@
 <img src="assets/readme/header.svg" alt="Ternitor, animated: a blank console window opens over the Ternitor settings screen and everything dims behind it, the Start with Windows switch flips to ON, the console disappears, and the hidden counter steps from 000 to 003" width="920">
 
 **Hides the blank console windows Windows opens for other people's processes.**
-One file, no installer, no runtime, no telemetry — and nothing visible once it is running.
+One file, no runtime, no telemetry — and nothing visible once it is running.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-windows%2011-58a6ff?style=flat-square)](#requirements)
 [![Rust](https://img.shields.io/badge/rust-2021-d29922?style=flat-square&logo=rust&logoColor=white)](#build-it)
 [![Telemetry](https://img.shields.io/badge/telemetry-none-7ee787?style=flat-square)](#privacy)
-[![Size](https://img.shields.io/badge/size-174%20KB-8b949e?style=flat-square)](#files)
+[![Size](https://img.shields.io/badge/size-567%20KB-8b949e?style=flat-square)](#files)
 
 </div>
 
@@ -36,17 +36,30 @@ because `C:\Program Files\nodejs` is on Machine `PATH` and User `PATH` is append
 ## Quickstart
 
 ```
+.\install.ps1
+```
+
+Installs for the current user — no administrator rights, no installer runtime. It copies
+`ternitor.exe` to `%LOCALAPPDATA%\Programs\Ternitor`, adds a Start Menu shortcut, points the per-user
+`Run` key at it, and registers an entry in **Settings > Apps** so it can be removed like anything
+else. `install.ps1 -NoStartWithWindows -NoLaunch` if you want it installed but neither starting at
+sign-in nor running yet.
+
+Or skip all of that and run the exe where it stands. There is nothing to unpack:
+
+```
 ternitor.exe
 ```
 
-That is the whole install. The app starts in the notification area, hides the next blank console it
-sees, and stays out of the way.
+Either way it starts in the notification area, hides the next blank console it sees, and stays out of
+the way.
 
 **Left-click the tray icon** for Settings. **Right-click** for Settings, Pause hiding, Open log, Exit.
 
 To have it start at logon, open Settings and flip **Start with Windows**. That writes one value under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Delete the exe and that value and nothing is
-left behind.
+left behind. **Uninstall** in Settings > Apps runs `uninstall.ps1`, which stops the app and takes
+away the exe, the folder, the shortcut, the `Run` value and that entry.
 
 ## What you get
 
@@ -55,7 +68,7 @@ left behind.
 | **Hides the window** | Before it paints, not after — no flash, no focus steal, no flicker in the taskbar |
 | **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked and re-shown, without activation, once its title reveals it was a real shell |
 | **Counts its work** | The settings screen carries a live count of what it has hidden this session, and the title of the last one |
-| **Refuses to grow** | Three things on the settings screen and nothing else. Everything that is not a setting lives on the tray menu |
+| **Refuses to grow** | Four things on the settings screen and nothing else — a switch, the counter, app info, and a way out. Everything that is not one of those lives on the tray menu |
 | **Says nothing** | No network calls, no telemetry, no update check, no crash reporting |
 
 ## How it works
@@ -84,32 +97,56 @@ Event-driven, no polling, and a terminal you opened yourself is never touched.
 ## Settings
 
 The settings window is the app's only surface, opened from the tray and perhaps once a session. It
-carries three things and refuses to carry a fourth: **Start with Windows**, a live count of the
-windows hidden this session, and app info.
+carries four things and refuses to carry a fifth: **Start with Windows**, a live count of the windows
+hidden this session, app info, and **Quit**, which ends the process completely — the same thing the
+tray menu's *Exit* does, for when the icon is hard to find.
 
 Everything else stays on the tray menu, because a utility whose value is *not being noticed* should
 not grow a control panel.
 
 What it looks like is documented in [DESIGN.md](DESIGN.md). The surface is a bench instrument panel —
-a mechanical counter, a punched switch, a grease pencil — and the counter is the only number on it,
-because the count is the whole of what Ternitor produces.
+a mechanical counter, a switch, a grease pencil — and the counter is the only number on it, because
+the count is the whole of what Ternitor produces.
 
 ## Requirements
 
-- **Windows 11, x64.** No runtime, no redistributable, no Node, no PowerShell.
-- **174 KB.** One exe. Nothing is installed and nothing is written outside its own folder and one
-  registry value you can see and delete.
+- **Windows 11, x64.** No runtime, no redistributable, no Node. PowerShell only for the installer,
+  which you can skip.
+- **567 KB.** One exe, most of it the icon. Nothing is written outside its own folder and the
+  registry values you can see and delete.
 - **Nothing at startup.** The build is a GUI-subsystem binary (PE subsystem 2), so it can never
   allocate a console — which is what stops it flashing one of its own at logon. An earlier scripting
   version needed a `wscript` shim and a headless `conhost` to achieve the same thing; a compiled app
   gets it for free.
 - **No GPU, no service, no scheduled task, no driver.**
 
+## Other platforms
+
+It builds and runs anywhere, and on Linux and macOS it does nothing, on purpose:
+
+```
+$ ternitor --why
+Ternitor does nothing on macos: there is nothing here to hide.
+...
+```
+
+The windows it hides are made by Windows itself — a ConPTY client with no console spawns a child, the
+child gets a brand-new console, and the default-terminal broker hands that console to Windows Terminal
+as a visible window. Linux and macOS have no such mechanism, and `janitor.rs` has nothing to port: the
+detection is Windows' own window classes and the broker's `-Embedding` flag. A resident process
+pretending otherwise would be a lie with a tray icon attached, so there isn't one, nothing is written
+to disk, and no autostart entry is created.
+
+The build is `cargo build --release` on any target; the non-Windows `main` is a few lines in
+`src/main.rs` and the Win32 modules are behind `cfg(windows)`.
+
 ## Privacy
 
 Nothing leaves the machine. There is no network code in the binary at all — no telemetry, no
 analytics, no update check. The one file it writes is `ternitor.log` beside the exe: every hide, every
 re-show, every toggle. Read it, or delete it while the app is running.
+
+The full accounting of what it reads and writes is in [PRIVACY.md](PRIVACY.md).
 
 ## Build it
 
@@ -128,8 +165,11 @@ Rebuild before trusting it.
 |---|---|
 | `ternitor.exe` | the app; run it directly |
 | `ternitor.log` | created next to the exe on first run |
+| `install.ps1` / `uninstall.ps1` | per-user install and removal, no administrator rights |
 | `src/` | `janitor.rs` detection, `ui.rs` the settings surface, `tray.rs` the icon |
+| `src/mark.rs` | the app mark: the one definition of the icon, which `build.rs` bakes into the exe |
 | `assets/readme/` | the animated header on this page, as SVG |
+| `assets/icon.svg` | the app icon, generated from `src/mark.rs` |
 
 ## Moving it
 
@@ -143,6 +183,8 @@ points at the copy you kept.
 
 - [DESIGN.md](DESIGN.md) — the settings surface: palette, type, layout, and the rules behind them
 - [PRODUCT.md](PRODUCT.md) — what the product is for, and what it deliberately does not do
+- [PRIVACY.md](PRIVACY.md) — everything it reads and writes, and where
+- [TERMS.md](TERMS.md) — plain-language terms; the MIT licence is the document that binds
 
 ## License
 

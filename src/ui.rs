@@ -40,7 +40,8 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::SystemInformation::GetLocalTime;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    TrackMouseEvent, TRACKMOUSEEVENT, TME_LEAVE, VK_ESCAPE, VK_RETURN, VK_SPACE,
+    ReleaseCapture, SetCapture, TrackMouseEvent, TRACKMOUSEEVENT, TME_LEAVE, VK_ESCAPE, VK_RETURN,
+    VK_SPACE, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DefWindowProcW, DestroyWindow,
@@ -59,6 +60,9 @@ use crate::win::{instance, pcw, wide};
 /// to pull in that whole feature for one message number.
 const WM_MOUSELEAVE: u32 = 0x02A3;
 
+/// `WM_CAPTURECHANGED`, declared here for the same reason.
+const WM_CAPTURECHANGED: u32 = 0x0215;
+
 // ---------------------------------------------------------------- metrics ---
 //
 // Logical pixels at 96dpi. Everything scales through `theme::px`.
@@ -72,13 +76,35 @@ const DIGIT_W: i32 = 40;
 const DIGIT_GAP: i32 = 3;
 const DIGIT_H: i32 = 58;
 
-/// The autostart punch.
-const PUNCH_X: i32 = 452;
-const PUNCH_Y: i32 = 164;
-const PUNCH_W: i32 = 64;
-const PUNCH_H: i32 = 36;
+/// The Start with Windows toggle.
+const TOGGLE_X: i32 = 452;
+const TOGGLE_Y: i32 = 164;
+const TOGGLE_W: i32 = 64;
+const TOGGLE_H: i32 = 36;
+
+/// The quit button, in the right corner of the footer.
+const QUIT_W: i32 = 88;
+const QUIT_H: i32 = 28;
+const QUIT_TOP: i32 = 288;
+
+/// The quit button sits under the footer rule and inside the sheet. Both are
+/// constants, so this is settled at compile time rather than at run time.
+const _: () = {
+    assert!(QUIT_TOP > 284, "the quit button would start above the footer rule");
+    assert!(
+        QUIT_TOP + QUIT_H <= H - PAD / 2,
+        "the quit button would fall off the sheet"
+    );
+};
 
 // ------------------------------------------------------------------ state ---
+
+/// Everything on the surface a pointer or the keyboard can act on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Control {
+    Autostart,
+    Quit,
+}
 
 /// A memory DC with a bitmap the size of the client, kept across paints.
 struct Buf {
@@ -116,11 +142,12 @@ impl Drop for Buf {
 
 struct Ui {
     hwnd: HWND,
-    hover: bool,
-    focus: bool,
-    pressed: bool,
-    /// Why the last toggle did not take. Shown under the punch, because a control
-    /// that refuses silently is worse than no control.
+    hover: Option<Control>,
+    /// Where the keyboard is, if it is driving at all. The ring follows it.
+    focus: Option<Control>,
+    pressed: Option<Control>,
+    /// Why the last toggle did not take. Shown under the switch, because a
+    /// control that refuses silently is worse than no control.
     autostart_error: Option<String>,
     scale: f32,
     fonts: Option<Fonts>,
@@ -134,9 +161,9 @@ impl Ui {
     fn new() -> Ui {
         Ui {
             hwnd: HWND::default(),
-            hover: false,
-            focus: false,
-            pressed: false,
+            hover: None,
+            focus: None,
+            pressed: None,
             autostart_error: None,
             scale: 1.0,
             fonts: None,
@@ -461,73 +488,102 @@ fn draw_counter(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts) {
     }
 }
 
-fn punch_rect(s: f32) -> RECT {
+fn toggle_rect(s: f32) -> RECT {
     RECT {
-        left: theme::px(PUNCH_X as f32, s),
-        top: theme::px(PUNCH_Y as f32, s),
-        right: theme::px((PUNCH_X + PUNCH_W) as f32, s),
-        bottom: theme::px((PUNCH_Y + PUNCH_H) as f32, s),
+        left: theme::px(TOGGLE_X as f32, s),
+        top: theme::px(TOGGLE_Y as f32, s),
+        right: theme::px((TOGGLE_X + TOGGLE_W) as f32, s),
+        bottom: theme::px((TOGGLE_Y + TOGGLE_H) as f32, s),
     }
+}
+
+fn quit_rect(s: f32) -> RECT {
+    RECT {
+        left: theme::px((W - PAD - QUIT_W) as f32, s),
+        top: theme::px(QUIT_TOP as f32, s),
+        right: theme::px((W - PAD) as f32, s),
+        bottom: theme::px((QUIT_TOP + QUIT_H) as f32, s),
+    }
+}
+
+/// The ring the keyboard leaves on whatever it is pointing at, drawn just
+/// outside the control so it never covers the control's own outline.
+fn focus_ring(p: &Painter, r: RECT, pal: &Palette) {
+    let ring = p.d(4.0);
+    p.frame(
+        RECT {
+            left: r.left - ring,
+            top: r.top - ring,
+            right: r.right + ring,
+            bottom: r.bottom + ring,
+        },
+        pal.dim,
+    );
 }
 
 fn draw_autostart(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &Ui) {
     p.text(
         "START WITH WINDOWS",
-        p.d(PUNCH_X as f32),
+        p.d(TOGGLE_X as f32),
         p.d(144.0),
         fonts.label,
         pal.dim,
         theme::LABEL_TRACKING,
     );
 
-    let r = punch_rect(p.s);
+    let r = toggle_rect(p.s);
     let on = snap.autostart;
+    let hot = ui.hover == Some(Control::Autostart);
+    let down = ui.pressed == Some(Control::Autostart);
 
-    // State is a mark: an intact strip is OFF, a punched hole is ON. Both states
-    // draw their outline at the same weight, so OFF never reads as half-disabled.
-    let edge = if on || ui.hover || ui.pressed {
-        pal.ink
-    } else {
-        pal.body
-    };
-    p.round(r, p.d(4.0), edge, None);
-
-    // A switch already at ink cannot answer the pointer with a colour, so the
-    // slug is what moves: pressing always takes a pixel of material, and hovering
-    // over an armed switch gives one back. Feedback stays a mark, not a colour.
-    let give = if ui.pressed {
-        -1.0
-    } else if on && ui.hover {
-        1.0
-    } else {
-        0.0
-    };
-    let slug = p.d(18.0 + give * 2.0);
-    let (cx, cy) = ((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-    let slug_r = RECT {
-        left: cx - slug / 2,
-        top: cy - slug / 2,
-        right: cx + slug / 2,
-        bottom: cy + slug / 2,
-    };
+    // A switch, and it reads as one: a track with a knob at the end it belongs
+    // to. Armed, the track itself is ink and the knob is knocked out of it;
+    // unarmed, the track is an outline and the knob rides left in body text, so
+    // OFF never reads as half-disabled.
+    let track = (r.bottom - r.top) / 2;
+    let edge = if on || hot || down { pal.ink } else { pal.body };
     if on {
-        p.round(slug_r, p.d(2.0), pal.ink, Some(pal.ink));
+        p.round(r, track, pal.ink, Some(pal.ink));
     } else {
-        p.round(slug_r, p.d(2.0), if ui.hover || ui.pressed { pal.ink } else { pal.body }, None);
+        p.round(r, track, edge, None);
     }
 
-    // The focus ring only appears when the keyboard is driving.
-    if ui.focus {
-        let ring = p.d(4.0);
-        p.frame(
-            RECT {
-                left: r.left - ring,
-                top: r.top - ring,
-                right: r.right + ring,
-                bottom: r.bottom + ring,
-            },
-            pal.dim,
-        );
+    // A switch already at ink cannot answer the pointer with a colour, so the
+    // knob is what moves: pressing always takes a pixel of material, and hovering
+    // over an armed switch gives one back. Feedback stays a mark, not a colour.
+    let give = if down {
+        -p.d(2.0)
+    } else if on && hot {
+        p.d(2.0)
+    } else {
+        0
+    };
+    // The knob is concentric with the end it sits in, not merely inset from it:
+    // that is what makes the two curves read as a knob in a channel rather than
+    // as two outlines crossing.
+    let cap = r.bottom - r.top; // the end caps are half-circles of this radius
+    let d = cap - 2 * p.d(6.0) + give;
+    let cy = (r.top + r.bottom) / 2;
+    let cx = if on {
+        r.right - cap / 2
+    } else {
+        r.left + cap / 2
+    };
+    let knob = RECT {
+        left: cx - d / 2,
+        top: cy - d / 2,
+        right: cx + d / 2,
+        bottom: cy + d / 2,
+    };
+    if on {
+        p.round(knob, d / 2, pal.ground, Some(pal.ground));
+    } else {
+        let c = if hot || down { pal.ink } else { pal.body };
+        p.round(knob, d / 2, c, down.then_some(c));
+    }
+
+    if ui.focus == Some(Control::Autostart) {
+        focus_ring(p, r, pal);
     }
 
     // The operator's tick: they armed this one.
@@ -555,9 +611,46 @@ fn draw_autostart(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui
     );
 }
 
+/// Quit. Last thing in the reading order, in the corner where a way out belongs,
+/// and drawn only once the user has found it on purpose.
+fn draw_quit(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui) {
+    let r = quit_rect(p.s);
+    let hot = ui.hover == Some(Control::Quit);
+    let down = ui.pressed == Some(Control::Quit);
+
+    // Pressing takes the whole plate: the one control that ends the process says
+    // so before the button comes up, not after.
+    if down {
+        p.round(r, p.d(4.0), pal.ink, Some(pal.ink));
+    } else {
+        p.round(r, p.d(4.0), if hot { pal.ink } else { pal.body }, None);
+    }
+    if ui.focus == Some(Control::Quit) {
+        focus_ring(p, r, pal);
+    }
+
+    let ink = if down {
+        pal.ground
+    } else if hot {
+        pal.ink
+    } else {
+        pal.body
+    };
+    // Centred by hand rather than with DrawTextW, which has nowhere to put the
+    // edge printing's tracking.
+    let w = p.measure("QUIT", fonts.label, theme::LABEL_TRACKING);
+    p.text(
+        "QUIT",
+        (r.left + r.right - w) / 2,
+        (r.top + r.bottom) / 2 - p.d(7.0),
+        fonts.label,
+        ink,
+        theme::LABEL_TRACKING,
+    );
+}
+
 fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &Ui) {
     let left = p.d(PAD as f32);
-    let right = p.d((W - PAD) as f32);
 
     p.text("Ternitor", left, p.d(20.0), fonts.title, pal.ink, 0.0);
     for (i, line) in [
@@ -608,10 +701,10 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
     draw_counter(p, pal, snap, fonts);
     draw_autostart(p, pal, snap, fonts, ui);
 
-    // The small print is also where a refused toggle explains itself. The punch
+    // The small print is also where a refused toggle explains itself. The switch
     // cannot change state on its own, so the reason takes the space already
     // there rather than adding an element.
-    let x = p.d(PUNCH_X as f32);
+    let x = p.d(TOGGLE_X as f32);
     match &ui.autostart_error {
         Some(why) => {
             let line = p.fit(
@@ -652,7 +745,17 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
         std::env::consts::ARCH
     );
     p.text(&info, left, p.d(302.0), fonts.mono, pal.dim, 0.0);
-    p.text_right("log: ternitor.log", right, p.d(302.0), fonts.mono, pal.dim, 0.0);
+
+    draw_quit(p, pal, fonts, ui);
+    // The log hint stops short of the button rather than running under it.
+    p.text_right(
+        "log: ternitor.log",
+        quit_rect(p.s).left - p.d(24.0),
+        p.d(302.0),
+        fonts.mono,
+        pal.dim,
+        0.0,
+    );
 }
 
 fn span(d: Duration) -> String {
@@ -739,15 +842,35 @@ fn paint(hwnd: HWND) {
 
 // ------------------------------------------------------------ the window ---
 
-fn punch_hit(hwnd: HWND, x: i32, y: i32) -> bool {
-    let s = with_ui(|ui| {
-        let _ = hwnd;
-        ui.scale
-    });
-    // A little slop around the punch, because it is a small target.
-    let r = punch_rect(s);
+/// What is under the pointer, if anything. Both controls are small targets, so
+/// each gets a little slop around it.
+fn hit(x: i32, y: i32) -> Option<Control> {
+    let s = with_ui(|ui| ui.scale);
     let slop = theme::px(6.0, s);
-    x >= r.left - slop && x < r.right + slop && y >= r.top - slop && y < r.bottom + slop
+    let near = |r: RECT| x >= r.left - slop && x < r.right + slop && y >= r.top - slop && y < r.bottom + slop;
+
+    if near(quit_rect(s)) {
+        Some(Control::Quit)
+    } else if near(toggle_rect(s)) {
+        Some(Control::Autostart)
+    } else {
+        None
+    }
+}
+
+/// Run a control. Returns false when it ended the process, so nothing tries to
+/// paint a window that is already gone.
+fn activate(control: Control) -> bool {
+    match control {
+        Control::Autostart => {
+            toggle();
+            true
+        }
+        Control::Quit => {
+            app::quit();
+            false
+        }
+    }
 }
 
 /// Flip Start with Windows. The registry is the truth, so the surface re-reads it
@@ -792,7 +915,7 @@ unsafe extern "system" fn sheet_proc(
             r
         }
         WM_MOUSEMOVE => {
-            let over = punch_hit(hwnd, word(lparam.0, 0), word(lparam.0, 16));
+            let over = hit(word(lparam.0, 0), word(lparam.0, 16));
             if with_ui(|ui| std::mem::replace(&mut ui.hover, over) != over) {
                 redraw(hwnd);
             }
@@ -806,42 +929,82 @@ unsafe extern "system" fn sheet_proc(
             LRESULT(0)
         }
         WM_MOUSELEAVE => {
-            if with_ui(|ui| std::mem::replace(&mut ui.hover, false)) {
+            if with_ui(|ui| ui.hover.take()).is_some() {
                 redraw(hwnd);
             }
             LRESULT(0)
         }
         WM_LBUTTONDOWN => {
-            if punch_hit(hwnd, word(lparam.0, 0), word(lparam.0, 16)) {
-                with_ui(|ui| ui.pressed = true);
+            if let Some(c) = hit(word(lparam.0, 0), word(lparam.0, 16)) {
+                with_ui(|ui| ui.pressed = Some(c));
+                // Capture, so the release comes here even if it happens off the
+                // window. Without it a press that drags outside never sees its
+                // button-up, and the control keeps drawing itself held down.
+                SetCapture(hwnd);
                 redraw(hwnd);
             }
             LRESULT(0)
         }
         WM_LBUTTONUP => {
-            let was = with_ui(|ui| std::mem::replace(&mut ui.pressed, false));
-            if was && punch_hit(hwnd, word(lparam.0, 0), word(lparam.0, 16)) {
-                with_ui(|ui| ui.focus = true);
-                toggle();
+            // Released on the control it was pressed on, or nothing happens --
+            // the standard way out of a mis-press. The pressed state is taken
+            // *before* the capture is released: releasing it sends
+            // WM_CAPTURECHANGED straight back here, and that arm would consume
+            // the press before this one could act on it.
+            let pressed = with_ui(|ui| ui.pressed.take());
+            let _ = ReleaseCapture();
+            if let Some(c) = pressed {
+                if hit(word(lparam.0, 0), word(lparam.0, 16)) == Some(c) {
+                    with_ui(|ui| ui.focus = Some(c));
+                    if !activate(c) {
+                        return LRESULT(0);
+                    }
+                }
             }
             redraw(hwnd);
             LRESULT(0)
         }
+        // The capture went somewhere else -- another window grabbed it, or we lost
+        // it to the shell. There is no button-up coming, so let the control go.
+        WM_CAPTURECHANGED => {
+            if with_ui(|ui| ui.pressed.take()).is_some() {
+                redraw(hwnd);
+            }
+            LRESULT(0)
+        }
         WM_SETFOCUS => {
-            with_ui(|ui| ui.focus = true);
-            redraw(hwnd);
+            let was = with_ui(|ui| ui.focus.replace(Control::Autostart));
+            if was.is_none() {
+                redraw(hwnd);
+            }
             LRESULT(0)
         }
         // WA_INACTIVE: the keyboard is no longer driving, so the ring goes away.
         WM_ACTIVATE => {
-            if uword(wparam.0, 0) == 0 && with_ui(|ui| std::mem::replace(&mut ui.focus, false)) {
+            if uword(wparam.0, 0) == 0 && with_ui(|ui| ui.focus.take()).is_some() {
                 redraw(hwnd);
             }
             LRESULT(0)
         }
         WM_KEYDOWN => {
             match wparam.0 as u16 {
-                k if k == VK_SPACE.0 || k == VK_RETURN.0 => toggle(),
+                // Tab walks the two controls; everything else acts on the one the
+                // ring is on, which is the switch unless the keyboard moved it.
+                k if k == VK_TAB.0 => {
+                    with_ui(|ui| {
+                        ui.focus = Some(match ui.focus {
+                            Some(Control::Autostart) => Control::Quit,
+                            _ => Control::Autostart,
+                        })
+                    });
+                    redraw(hwnd);
+                }
+                k if k == VK_SPACE.0 || k == VK_RETURN.0 => {
+                    let target = with_ui(|ui| ui.focus.unwrap_or(Control::Autostart));
+                    if !activate(target) {
+                        return LRESULT(0);
+                    }
+                }
                 k if k == VK_ESCAPE.0 => {
                     let _ = ShowWindow(hwnd, SW_HIDE);
                 }
@@ -853,7 +1016,7 @@ unsafe extern "system" fn sheet_proc(
             let mut pt = POINT::default();
             let _ = GetCursorPos(&mut pt);
             let _ = ScreenToClient(hwnd, &mut pt);
-            if punch_hit(hwnd, pt.x, pt.y) {
+            if hit(pt.x, pt.y).is_some() {
                 if let Ok(c) = LoadCursorW(None, IDC_HAND) {
                     SetCursor(Some(c));
                 }
@@ -888,7 +1051,14 @@ unsafe extern "system" fn sheet_proc(
             LRESULT(0)
         }
         WM_DESTROY => {
-            with_ui(|ui| ui.drop_cache());
+            with_ui(|ui| {
+                ui.drop_cache();
+                // The handle is dead from here on. `is_invalid` is only a null
+                // check, so leaving it set would make a later `open` skip
+                // recreating the window and a later `refresh` invalidate a
+                // destroyed -- possibly recycled -- handle.
+                ui.hwnd = HWND::default();
+            });
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1023,12 +1193,12 @@ mod tests {
         r
     }
 
-    /// The counter's column, `PUNCH_X` to the right margin. The paused indicator
+    /// The counter's column, `TOGGLE_X` to the right margin. The paused indicator
     /// replaces the counter's label with two words instead of one, and must stay
     /// inside the same column.
     #[test]
     fn the_paused_label_fits_the_counter_column() {
-        let column = theme::px((W - PAD - PUNCH_X) as f32, 1.0);
+        let column = theme::px((W - PAD - TOGGLE_X) as f32, 1.0);
         let w = bench(|p, f| {
             p.measure("PAUSED", f.label, theme::LABEL_TRACKING)
                 + theme::px(12.0, 1.0)
@@ -1046,6 +1216,140 @@ mod tests {
         assert!(
             para_right < housing_left,
             "paragraph reaches {para_right}, a three-digit counter starts at {housing_left}"
+        );
+    }
+
+    /// Paint the sheet off-screen and write it out as a BMP, so the surface can
+    /// be looked at without being opened. `TERNITOR_PREVIEW=<dir>` says where;
+    /// without it the test does nothing. Ignored by default because it writes
+    /// files, and because a normal run has nothing to say about how it looks.
+    #[test]
+    #[ignore = "writes preview bitmaps"]
+    fn write_preview() {
+        use windows::Win32::Graphics::Gdi::{
+            BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateDIBSection, DIB_RGB_COLORS,
+        };
+
+        let Ok(dir) = std::env::var("TERNITOR_PREVIEW") else {
+            return;
+        };
+        let dir = std::path::PathBuf::from(dir);
+        let scale = 1.0;
+        let (w, h) = (theme::px(W as f32, scale), theme::px(H as f32, scale));
+
+        let dc = unsafe { CreateCompatibleDC(None) };
+        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w,
+                biHeight: -h, // top-down, so the buffer reads the way the sheet does
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let bmp = unsafe { CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0) }
+            .expect("a DIB to paint into");
+        // Nothing is drawn until it is selected in: a fresh memory DC paints on
+        // its own 1x1 monochrome bitmap otherwise.
+        unsafe { SelectObject(dc, bmp.into()) };
+        let px = unsafe { std::slice::from_raw_parts(bits as *const u8, (w * h * 4) as usize) };
+
+        let p = Painter { hdc: dc, s: scale };
+        let pal = &theme::PALETTE;
+        let fonts = theme::fonts(scale);
+
+        for (name, autostart, ui) in [
+            ("on", true, Ui::new()),
+            ("off", false, Ui::new()),
+            (
+                "quit-hover",
+                false,
+                Ui {
+                    hover: Some(Control::Quit),
+                    ..Ui::new()
+                },
+            ),
+            (
+                "switch-focus",
+                true,
+                Ui {
+                    focus: Some(Control::Autostart),
+                    ..Ui::new()
+                },
+            ),
+        ] {
+            bake_ground(&p, pal);
+            let snap = Snapshot {
+                paused: false,
+                hidden: 243,
+                autostart,
+                last_title: r"C:\Program Files\nodejs\node.exe".to_string(),
+                session_start: Instant::now(),
+            };
+            draw_sheet(&p, pal, &snap, &fonts, &ui);
+            write_bmp(&dir.join(format!("sheet-{name}.bmp")), px, w, h);
+        }
+
+        fonts.destroy();
+        unsafe {
+            let _ = DeleteObject(bmp.into());
+            let _ = DeleteDC(dc);
+        }
+    }
+
+    /// A 32bpp BMP, bottom-up, which is the one image format that needs no
+    /// encoder. Alpha is dropped: the sheet is opaque everywhere.
+    fn write_bmp(path: &std::path::Path, px: &[u8], w: i32, h: i32) {
+        let row = (w * 4) as usize;
+        let mut out = Vec::with_capacity(54 + row * h as usize);
+        let u32le = |out: &mut Vec<u8>, v: u32| out.extend_from_slice(&v.to_le_bytes());
+        out.extend_from_slice(b"BM");
+        u32le(&mut out, (54 + row * h as usize) as u32);
+        u32le(&mut out, 0);
+        u32le(&mut out, 54);
+        u32le(&mut out, 40);
+        u32le(&mut out, w as u32);
+        u32le(&mut out, h as u32);
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&32u16.to_le_bytes());
+        for v in [0, row as u32 * h as u32, 0, 0, 0, 0] {
+            u32le(&mut out, v);
+        }
+        for y in (0..h).rev() {
+            let start = y as usize * row;
+            let mut line = px[start..start + row].to_vec();
+            // GDI leaves a 32bpp BI_RGB padding byte at zero, and everything that
+            // reads one back treats it as alpha: the sheet is opaque, so say so.
+            for b in line.iter_mut().skip(3).step_by(4) {
+                *b = 255;
+            }
+            out.extend_from_slice(&line);
+        }
+        std::fs::write(path, out).expect("write the preview");
+    }
+
+    /// The quit button shares the footer with the log hint, and the hint is what
+    /// has to give way: the button is a control, and a control behind text is not
+    /// one.
+    #[test]
+    fn the_quit_button_clears_the_footer() {
+        let label = bench(|p, f| p.measure("QUIT", f.label, theme::LABEL_TRACKING));
+        let width = theme::px(QUIT_W as f32, 1.0);
+        assert!(
+            label + theme::px(16.0, 1.0) <= width,
+            "the label is {label}px in a {width}px button"
+        );
+
+        let hint = bench(|p, f| p.measure("log: ternitor.log", f.mono, 0.0));
+        let hint_right = W - PAD - QUIT_W - 24;
+        assert!(
+            hint_right - hint > PAD,
+            "the log hint would run back to {} and the left margin is {PAD}",
+            hint_right - hint
         );
     }
 }

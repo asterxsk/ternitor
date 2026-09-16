@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">Ternitor</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B1F21"/>
+      <stop offset="1" stop-color="#090B0C"/>
+    </linearGradient>
+    <linearGradient id="node" x1="42.21" y1="26.88" x2="202.24" y2="186.91" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6ABF4B"/>
+      <stop offset="1" stop-color="#3F873F"/>
+    </linearGradient>
+    <mask id="knock">
+      <rect width="256" height="256" fill="#fff"/>
+      <path d="M135.17 131.33L202.75 198.91M135.17 198.91L202.75 131.33" stroke="#000" stroke-width="40.96" stroke-linecap="round" fill="none"/>
+    </mask>
+  </defs>
+  <rect width="256" height="256" rx="57.60" fill="url(#tile)"/>
+  <polygon points="116.48,26.88 190.75,69.76 190.75,155.52 116.48,198.40 42.21,155.52 42.21,69.76" fill="url(#node)" mask="url(#knock)"/>
+  <path d="M135.17 131.33L202.75 198.91M135.17 198.91L202.75 131.33" stroke="#DC2626" stroke-width="27.14" stroke-linecap="round" fill="none"/>
+</svg>

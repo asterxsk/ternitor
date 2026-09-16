@@ -9,6 +9,15 @@ windows
 (Native Win32 desktop app. Not the `web | ios | android | adaptive` enum: it is a
 single-OS native surface, not a website and not one product adapting per OS.)
 
+The crate builds on any target -- the Win32 modules are behind `cfg(windows)` and
+`windows` is a Windows-only dependency -- and on Linux and macOS the binary says
+plainly that it has nothing to do there and exits. The defect it fixes is
+Windows': a ConPTY client with no console spawns a child, the child gets a brand
+new console, and the default-terminal broker hands that console to Windows
+Terminal as a visible window. Nothing on Linux or macOS opens a terminal behind
+the user's back, so there is no `janitor` to port and no honest resident process
+to leave running. Decided 2026-09-16, over porting or doing nothing.
+
 ## Stack
 
 user-specified: Rust, `windows` 0.62 crate for raw Win32 bindings, no GUI
@@ -61,23 +70,39 @@ consoles, so nothing is hiding its own at boot.
 
 - Single instance, enforced by a named mutex.
 - Tray icon with a small menu; one settings window, opened from the tray.
-- The settings window carries exactly three things: a "Start with Windows" toggle,
-  a live count of windows hidden this session, and app info describing what the
-  app does. Behaviour beyond that is not configurable (confirmed: no pause
-  toggle, no restore-shells toggle, no log toggle on the screen).
+- The settings window carries exactly four things: a "Start with Windows" toggle,
+  a live count of windows hidden this session, app info describing what the app
+  does, and Quit, which ends the process outright -- the same thing the tray menu
+  offers, for when the tray icon is buried. Behaviour beyond that is not
+  configurable (confirmed: no pause toggle, no restore-shells toggle, no log
+  toggle on the screen). Quit added 2026-09-16, the only control added since the
+  Rust build.
 - Event-driven (`SetWinEventHook`), never polling.
-- Portable: no installer, no runtime dependency, config in the registry, log next
-  to the exe.
-- Behaviour parity with the PowerShell implementation is verified and the
-  PowerShell version (`ternitor.ps1`, `install.ps1`, the Startup `.vbs`) is
-  deleted, per the user's decision. `src/` is now the only implementation; the
-  tray icon it produces is byte-identical to the original at 16px and 32px.
+- No runtime dependency, config in the registry, log next to the exe. Still
+  portable -- copy the folder anywhere -- and now also installable:
+  `install.ps1` puts it in `%LOCALAPPDATA%\Programs\Ternitor` with a Start Menu
+  shortcut, the `Run` value, and an `HKCU\...\Uninstall` entry so it appears in
+  Settings > Apps, where `uninstall.ps1` removes all of it.
+- The app mark (a Node hexagon with a red X, on a dark tile) is defined once in
+  `src/mark.rs`; `build.rs` bakes the exe's `.ico` from it at build time and
+  `assets/icon.svg` is generated from the same constants, so the tray, the exe
+  icon and the SVG cannot drift apart. Replaced the ported PowerShell mark on
+  2026-09-16, which retires the old byte-identical-at-16px parity claim.
+- Behaviour parity with the PowerShell implementation is otherwise verified, and
+  the PowerShell version (`ternitor.ps1`, its installer, the Startup `.vbs`) is
+  deleted, per the user's decision. The `install.ps1` in the tree today is the
+  Rust build's installer, not the deleted one. `src/` is the only implementation.
+  The stale Startup `.vbs` the old installer left on this machine was removed on
+  2026-09-16; only the `Run` value remains.
 
 ## Evidence on Hand
 
 - `src/` -- the only implementation. `janitor.rs` holds the detection and
-  deferred re-show, `ui.rs` the settings surface, `icon.rs` the tray mark
-  (Node hexagon + red X, ported from the old rasteriser).
+  deferred re-show, `ui.rs` the settings surface, `mark.rs` the app mark (Node
+  hexagon + red X on a dark tile), `icon.rs` the Win32 handle over it.
+- `PRIVACY.md` and `TERMS.md` -- added 2026-09-16 at the user's request. The
+  privacy statement is factual (no network code, two registry values, one local
+  log); the terms defer to MIT rather than manufacturing a contract, and say so.
 - `ternitor.log` -- real hide/re-show history from this machine, still written by
   the Rust build.
 - Measurements on this machine. PowerShell version: 160 MB working set, 72 MB
@@ -94,4 +119,6 @@ consoles, so nothing is hiding its own at boot.
 2. Invisible by default. Every setting is a cost; only add one that changes what
    the app does in a way the user cannot get another way.
 3. Never touch a terminal a human opened.
-4. Zero ceremony: one file, no installer, no runtime, no first-run flow.
+4. Zero ceremony: one file, no runtime, no first-run flow. Installing is optional
+   — the exe runs where it stands, and `install.ps1` adds only the shell
+   integration that Settings > Apps and autostart need.

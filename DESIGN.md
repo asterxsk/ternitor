@@ -1,6 +1,6 @@
 ---
 name: Ternitor
-description: A bench instrument panel: a mechanical counter, a punch, and a grease pencil.
+description: A bench instrument panel: a mechanical counter, a switch, and a grease pencil.
 colors:
   ground: "#000000"
   speck: "#121212"
@@ -49,8 +49,8 @@ typography:
     lineHeight: 1
     letterSpacing: "normal"
 rounded:
-  punch: "4px"
-  slug: "2px"
+  plate: "4px"    # the quit button; corners knocked off a rectangle
+  track: "18px"   # the switch; half its height, so its ends are half-circles
 spacing:
   pad: "44px"
   gutter: "24px"
@@ -67,16 +67,29 @@ components:
   start-with-windows-off:
     backgroundColor: "{colors.ground}"
     textColor: "{colors.body}"
-    rounded: "{rounded.punch}"
+    rounded: "{rounded.track}"
+    border: "1px {colors.body}"
     padding: "0"
     width: "64px"
     height: "36px"
+    knob: "24px, {colors.ground}, 1px {colors.body}, concentric with the left cap"
   start-with-windows-on:
-    backgroundColor: "{colors.ground}"
+    backgroundColor: "{colors.ink}"
     textColor: "{colors.ink}"
-    rounded: "{rounded.punch}"
+    rounded: "{rounded.track}"
     width: "64px"
     height: "36px"
+    knob: "24px, {colors.ground}, concentric with the right cap"
+  quit:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.body}"
+    rounded: "{rounded.plate}"
+    typography: "{typography.label}"
+    hoverTextColor: "{colors.ink}"
+    activeBackgroundColor: "{colors.ink}"
+    activeTextColor: "{colors.ground}"
+    width: "88px"
+    height: "28px"
 ---
 
 # Ternitor — design system
@@ -90,7 +103,7 @@ perhaps once.
 
 That constraint decides everything. A utility whose value is *not being noticed*
 cannot have a surface that performs. So the surface is a **bench instrument
-panel**: a mechanical counter, a punched control, and a grease pencil, on a sheet
+panel**: a mechanical counter, a switch, and a grease pencil, on a sheet
 of film base. It is short, legible in one look, and each element is a real
 instrument rather than a decoration.
 
@@ -101,10 +114,11 @@ There is no history beside it because the app keeps none.
 
 Five rules hold the surface together:
 
-1. **Instruments, not controls.** Only two things answer the pointer: the punch
-   and the window itself. Everything else is a reading.
-2. **State is a mark, not a colour.** ON is a punched hole; OFF is an intact
-   strip. The whole surface reads correctly in greyscale.
+1. **Instruments, not controls.** Only three things answer the pointer: the
+   switch, the quit button, and the window itself. Everything else is a reading.
+2. **State is a mark, not a colour.** ON is a filled track with the knob knocked
+   out of it; OFF is an outlined track with an outlined knob. The whole surface
+   reads correctly in greyscale.
 3. **Orange is grease pencil, and grease pencil is the operator's hand.** It
    appears in exactly one place, the tick beside an armed switch. Never as a
    fill, never as a state colour.
@@ -135,7 +149,7 @@ marks with. Everything between them is film grey.
 - `body` carries running copy — the paragraph that says what the app does, and the
   small print under the control. 11.9:1 on the ground. A step above `dim` so that
   explanation never reads as annotation.
-- `ink` is primary copy, values, the counter's digits, and the punched state of a
+- `ink` is primary copy, values, the counter's digits, and the armed state of a
   control.
 - `grease` is the one saturated value on the surface, and it is rationed. It means
   *the operator's hand was here*: the tick beside an armed switch, and nothing
@@ -204,9 +218,12 @@ drop shadow is Windows' own, left alone.
 Rectangles and one round. The counter housing, its wheels and the rules are all
 rectangular with square corners: this is cut metal.
 
-The only rounded form is the **punch control** (4px, with a 2px slug inside),
-because it is the one shape that is literally *punched* rather than cut. That
-distinction is the shape system: cut is square, punched is round.
+Two radii, and each says what a thing is. **4px** is a plate with its corners
+knocked off — the quit button, the only soft-cornered rectangle here. A **full
+pill**, where the radius is half the height, is the switch track: the one form on
+the surface that is round in both axes, and therefore the only one that reads as
+something you throw rather than something you read. Cut is square; the switch
+moves.
 
 The grease mark is the exception to all of it — two strokes, one 3px and one 1px
 overshooting it at both ends, drawn to look waxy and by hand rather than as a
@@ -220,23 +237,36 @@ vector line.
 deliberately *not* a hero metric — wheels are an instrument, and an instrument
 states a measurement rather than performing one.
 
-**The punch.** The Start with Windows control, 64×36. OFF is an intact strip: a
-`body`-coloured outline with a hollow slug. ON is a punched hole: an `ink` outline
-with the slug filled solid, the material removed and light coming through — the
-same weight as OFF's, so an off switch never reads as a disabled one. A grease
-tick appears beside the state word when armed. The keyboard shows a square focus
-ring at a 4px offset.
+**The switch.** The Start with Windows control, 64×36: a track with a knob in one
+end, and the state word beside it. OFF is a `body`-coloured track with a `body`
+knob, both outline only. ON is an `ink` track, filled, with the knob knocked out
+of it in `ground` — the material is removed and light comes through. Both states
+draw at the same weight, so an off switch never reads as a disabled one. A grease
+tick appears beside the state word when armed.
+
+The knob is **concentric with the end cap it sits in**, not merely inset from it:
+same centre, radius 6px smaller. Two circles that share a centre read as a knob in
+a channel; two that do not read as two outlines crossing.
 
 An armed switch is already at `ink` and so cannot answer the pointer with a
-colour; the **slug** answers instead. Pressing takes a pixel of material off it
-in either state, and hovering over an armed switch gives one back — 18px at rest,
-20px hovered, 16px held. Feedback stays a mark. The control snaps between states;
-there is no slide.
+colour; the **knob** answers instead. Pressing takes 2px of material off it in
+either state, and hovering over an armed switch gives 2px back. Feedback stays a
+mark. The control snaps between states; there is no slide. The keyboard shows a
+`dim` focus ring at a 4px offset.
 
-When the write behind it fails the punch simply stays where it was, and the small
-print below it stops describing the registry and states the reason and the
-state it is still in. There is one control on this surface; it does not get to
-refuse silently.
+When the write behind it fails the switch simply stays where it was, and the small
+print below it stops describing the registry and states the reason and the state
+it is still in. It does not get to refuse silently.
+
+**The quit button.** 88×28 in the footer's right corner, 4px radius, `label` type
+centred by hand because `DrawTextW` has nowhere to put the tracking. Idle it is a
+`body` outline with `body` text — it is the last thing in the reading order and
+should not compete with the switch. Hovered, both go to `ink`; pressed, the plate
+fills `ink` and the text drops to `ground`. The one control that ends the process
+says so before the button comes up, not after. `Tab` moves the focus ring between
+it and the switch; `Enter` or `Space` fires whichever the ring is on, so the way
+out is reachable without the pointer. It is the same exit as the tray menu's, and
+there is no confirmation on either — the app holds no unsaved state to lose.
 
 **The paused indicator.** Pause lives on the tray menu, but it changes what the
 counter means — a frozen figure with no explanation is the one lie this surface
@@ -244,8 +274,9 @@ could tell. While paused, the counter's label reads `PAUSED` in `body` followed
 by `NOT COUNTING` in `dim`, in place of `HIDDEN THIS SESSION`. It is an indicator,
 not a control: there is still nothing to click.
 
-**The footer.** Version and target left; log location right. Static, `mono`,
-`dim`.
+**The footer.** Version and target left; log location and the quit button right.
+The log hint is static, `mono`, `dim`, and stops short of the button rather than
+running under it — a control behind text is not a control.
 
 ## Do's and Don'ts
 

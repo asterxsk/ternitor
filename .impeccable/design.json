@@ -54,7 +54,7 @@
       {
         "name": "no-slide",
         "value": "0ms",
-        "purpose": "The punch control snaps between states. There is no knob slide, no crossfade."
+        "purpose": "The switch snaps between states. There is no knob slide, no crossfade."
       }
     ],
     "breakpoints": [
@@ -77,20 +77,28 @@
       "css": ".ds-counter { display: inline-flex; border: 1px solid #2E2E2E; background: #000; } .ds-wheel { width: 40px; height: 58px; display: grid; place-items: center; font: 600 34px/1 'Cascadia Mono', Consolas, monospace; color: #fff; } .ds-wheel + .ds-wheel { border-left: 1px solid #2E2E2E; }"
     },
     {
-      "name": "Punch — off",
+      "name": "Switch — off",
       "kind": "button",
       "refersTo": "start-with-windows-off",
-      "description": "Start with Windows, off. An intact strip: a body-grey outline with a hollow slug inside, and the state word OFF beside it.",
-      "html": "<button class=\"ds-punch ds-punch-off\"><span class=\"ds-slug\"></span></button>",
-      "css": ".ds-punch { width: 64px; height: 36px; border-radius: 4px; background: #000; display: grid; place-items: center; cursor: pointer; } .ds-punch-off { border: 1px solid #C0C0C0; } .ds-slug { width: 18px; height: 18px; border-radius: 2px; border: 1px solid #C0C0C0; }"
+      "description": "Start with Windows, off. An outlined track with an outlined knob concentric with the left end cap, and the state word OFF beside it. Both draw at the same weight, so an off switch never reads as a disabled one.",
+      "html": "<button class=\"ds-switch ds-switch-off\"><span class=\"ds-knob\"></span></button><span class=\"ds-state\">OFF</span>",
+      "css": ".ds-switch { width: 64px; height: 36px; box-sizing: border-box; border-radius: 18px; background: #000; display: flex; align-items: center; cursor: pointer; } .ds-switch-off { border: 1px solid #C0C0C0; } .ds-switch-off .ds-knob { width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%; border: 1px solid #C0C0C0; margin-left: 5px; } .ds-state { font: 400 12.5px/1 'Cascadia Mono', monospace; color: #C0C0C0; margin-left: 25px; }"
     },
     {
-      "name": "Punch — on",
+      "name": "Switch — on",
       "kind": "button",
       "refersTo": "start-with-windows-on",
-      "description": "Start with Windows, armed. A punched hole: the outline lifts to ink and the slug fills solid — the material is removed and light comes through. A grease tick appears in the gap before the state word. An armed switch cannot answer the pointer with a colour, so the slug answers instead: 20px hovered, 16px held, 18px at rest. If the registry write fails the punch stays put and the small print below states the reason and the state it is still in.",
-      "html": "<button class=\"ds-punch ds-punch-on\"><span class=\"ds-slug\"></span></button><svg class=\"ds-tick\"><line x1=\"0\" y1=\"9\" x2=\"5\" y2=\"-2\"/></svg><span class=\"ds-state\">ON</span>",
-      "css": ".ds-punch-on { border: 1px solid #fff; } .ds-punch-on .ds-slug { background: #fff; border-color: #fff; } .ds-tick line { stroke: #FF6A13; stroke-width: 3; stroke-linecap: butt; } .ds-state { font: 400 12.5px/1 'Cascadia Mono', monospace; color: #fff; }"
+      "description": "Start with Windows, armed. An inked track with the knob knocked out of it in ground — the material is removed and light comes through. The knob is concentric with the right end cap: same centre, radius 6px smaller, because two circles that share a centre read as a knob in a channel and two that do not read as outlines crossing. A grease tick appears in the gap before the state word. An armed switch cannot answer the pointer with a colour, so the knob answers instead: 26px hovered, 22px held, 24px at rest. If the registry write fails the switch stays put and the small print below states the reason and the state it is still in.",
+      "html": "<button class=\"ds-switch ds-switch-on\"><span class=\"ds-knob\"></span></button><svg class=\"ds-tick\"><line x1=\"0\" y1=\"9\" x2=\"5\" y2=\"-2\"/></svg><span class=\"ds-state\">ON</span>",
+      "css": ".ds-switch-on { border: 1px solid #fff; background: #fff; } .ds-switch-on .ds-knob { background: #000; border: none; margin-left: auto; margin-right: 6px; } .ds-tick line { stroke: #FF6A13; stroke-width: 3; stroke-linecap: butt; } .ds-state { font: 400 12.5px/1 'Cascadia Mono', monospace; color: #fff; }"
+    },
+    {
+      "name": "Quit",
+      "kind": "button",
+      "refersTo": "quit",
+      "description": "Quit, in the footer's right corner. 88x28, 4px radius, label type centred by hand because DrawTextW has nowhere to put the edge printing's tracking. Idle a body outline with body text — it is last in the reading order and should not compete with the switch. Hovered, both go to ink. Pressed, the plate fills ink and the text drops to ground, so the one control that ends the process says so before the button comes up. Tab moves the focus ring between it and the switch; Enter or Space fires whichever the ring is on. Same exit as the tray menu's, and no confirmation on either: the app holds no unsaved state to lose.",
+      "html": "<button class=\"ds-quit\">QUIT</button>",
+      "css": ".ds-quit { width: 88px; height: 28px; border: 1px solid #C0C0C0; border-radius: 4px; background: #000; color: #C0C0C0; font: 700 11.5px/1 'Arial Narrow', sans-serif; letter-spacing: 1.4px; cursor: pointer; } .ds-quit:hover { border-color: #fff; color: #fff; } .ds-quit:active { background: #fff; color: #000; }"
     },
     {
       "name": "Grease tick",
@@ -103,10 +111,10 @@
   ],
   "narrative": {
     "northStar": "The Bench Instrument",
-    "overview": "Ternitor hides the blank console windows Windows opens for processes that have no console of their own. It lives in the notification area and does nothing visible; the settings window is the only surface it owns, and it is opened perhaps once. A utility whose value is not being noticed cannot have a surface that performs — so the surface is a bench instrument panel: a mechanical counter, a punched switch and a grease pencil, on a sheet of film base. It is short, legible in one look, and every element is a real instrument rather than a decoration.\n\nThe figure is the app. The counter measures work that leaves no trace — windows opened and taken away before they were drawn — and it is the only number on the surface, because the count is the whole of what Ternitor produces. That is only honest because it comes straight from the janitor, never from a hand-placed number.\n\nThe surface is black in every Windows theme. A bench is a dark room with a lit instrument, and this design is built around one black ground with ink lifted off it; inverting it would produce a different object rather than the same object in another theme.",
+    "overview": "Ternitor hides the blank console windows Windows opens for processes that have no console of their own. It lives in the notification area and does nothing visible; the settings window is the only surface it owns, and it is opened perhaps once. A utility whose value is not being noticed cannot have a surface that performs — so the surface is a bench instrument panel: a mechanical counter, a switch and a grease pencil, on a sheet of film base. It is short, legible in one look, and every element is a real instrument rather than a decoration.\n\nThe figure is the app. The counter measures work that leaves no trace — windows opened and taken away before they were drawn — and it is the only number on the surface, because the count is the whole of what Ternitor produces. That is only honest because it comes straight from the janitor, never from a hand-placed number.\n\nThe surface is black in every Windows theme. A bench is a dark room with a lit instrument, and this design is built around one black ground with ink lifted off it; inverting it would produce a different object rather than the same object in another theme.",
     "keyCharacteristics": [
       "One black ground, white ink, and a single rationed orange that always means the operator's hand.",
-      "State expressed as a mark — a punched hole versus an intact strip — so the surface reads correctly in greyscale.",
+      "State expressed as a mark — an inked track with the knob knocked out of it, versus an outlined track with an outlined knob — so the surface reads correctly in greyscale.",
       "Instruments instead of decoration: counts in wheels, states as marks, time as clock readings.",
       "No elevation anywhere. Separation is a one-pixel line at one of two weights.",
       "An instrument panel, not a settings dialog: two things answer the pointer and the rest is a reading.",
@@ -115,7 +123,7 @@
     "rules": [
       {
         "name": "Instruments, Not Controls",
-        "body": "Only two things on the surface answer the pointer: the punch and the window itself. Everything else is a reading. The app keeps no history, so the design must not imply one; a scrollbar or a list of what was hidden would promise a record that does not exist.",
+        "body": "Only three things on the surface answer the pointer: the switch, the quit button and the window itself. Everything else is a reading. The app keeps no history, so the design must not imply one; a scrollbar or a list of what was hidden would promise a record that does not exist.",
         "section": "layout"
       },
       {
@@ -130,7 +138,7 @@
       },
       {
         "name": "State Is A Mark, Not A Colour",
-        "body": "ON is a punched hole; OFF is an intact strip. Read the surface in greyscale and it still works — which is the test for every new element before its colour is considered.",
+        "body": "ON is a filled track with the knob knocked out of it; OFF is an outlined track with an outlined knob. Read the surface in greyscale and it still works — which is the test for every new element before its colour is considered.",
         "section": "components"
       },
       {
@@ -139,8 +147,8 @@
         "section": "layout"
       },
       {
-        "name": "Cut Is Square, Punched Is Round",
-        "body": "The counter housing, its wheels and the rules are all square-cornered: cut metal. Only the punch control is rounded, because it is the one shape that is literally punched.",
+        "name": "Cut Is Square, The Switch Is Round",
+        "body": "The counter housing, its wheels and the rules are all square-cornered: cut metal. The switch is the only form round in both axes — a track whose ends are half-circles, with a knob concentric to the end it sits in — because it is the one thing here that moves rather than reads. The quit plate’s 4px corners are the only other radius on the surface.",
         "section": "shapes"
       },
       {

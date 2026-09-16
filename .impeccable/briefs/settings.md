@@ -5,13 +5,13 @@ read what it has done, and decide whether it starts with Windows.
 
 ## Direction contract
 
-**THESIS.** A bench instrument panel: a mechanical counter, a punched switch, a
-grease pencil, on a sheet of film base. What it refuses is the category default —
+**THESIS.** A bench instrument panel: a mechanical counter, a switch, a grease
+pencil, on a sheet of film base. What it refuses is the category default —
 a Fluent settings page of rounded cards and one toggle row per setting, which is
 also what the product's own host OS would ship.
 
 **OWN-WORLD.** Black base, white ink, one rationed orange, film grey between them.
-A bordered counter housing of 40×58 wheels; a 64×36 punched switch; a hairline
+A bordered counter housing of 40×58 wheels; a 64×36 switch; a hairline
 rule dividing what the app *is* from what it has *done*. Strip it of all content
 and it is still unmistakably a bench instrument, not a preferences dialog.
 
@@ -23,9 +23,21 @@ without reading a paragraph.
 **FIRST VIEWPORT.** 720×344 fixed. Name and one paragraph upper-left. Counter
 wheels upper-right, 46–104, under a right-aligned label. Rule at 128. Two field
 rows mid-left: last cut, session clock. The switch and its small print mid-right.
-Footer rule and a single data line below. The primary action — the punch — sits in
-the right column at 452,164, unmissable because it is the only rounded shape on
-the surface.
+Footer rule, a data line, and the quit button in its right corner. The primary
+action — the switch — sits in the right column at 452,164, unmissable because it
+is the only shape on the surface that is round in both axes.
+
+**AMENDMENT (2026-09-16, second).** At the owner's direction the Start with
+Windows punch became a **switch**: one track, one knob, the knob concentric with
+the end cap it sits in, `ON` a filled track with the knob knocked out of it. The
+punch's slug-and-hole metaphor was the only thing on the surface that had to be
+*learned* to be read, and it stopped the control from saying "toggle" in one look.
+A **Quit** button was added to the footer's right corner — 88×28, 4px radius, the
+same exit as the tray menu's, for when the tray icon is buried. Reachable by
+`Tab`, fired by `Enter` or `Space`, no confirmation on either path. The surface is
+now four things rather than three. `src/mark.rs` also replaced the app mark: a
+Node hexagon with a red X on a dark tile, the same definition baking the exe's
+icon, the tray icon and `assets/icon.svg`. DESIGN.md is the current record.
 
 **AMENDMENT (2026-09-16).** The rail was cut from the surface at the owner's
 direction. The 84px band, its sprocket holes, the 13 frame cells, the cut mark and
@@ -48,8 +60,10 @@ provenance
 
 ## Product truth this surface answers to
 
-- Start with Windows (HKCU Run, one value), the live hidden count, and app info.
-  Nothing else is on the screen; no log toggle, no pause toggle.
+- Start with Windows (HKCU Run, one value), the live hidden count, app info, and
+  Quit. Nothing else is on the screen; no log toggle, no pause toggle.
 - Every number is live app state. The surface can never show a figure the app
   does not have.
-- Portable single exe, no installer.
+- One exe, no runtime dependency; portable by copying the folder, and also
+  installable per-user by `install.ps1` into `%LOCALAPPDATA%\Programs\Ternitor`,
+  which is what puts it in Settings > Apps.
