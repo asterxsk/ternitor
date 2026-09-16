@@ -1,10 +1,11 @@
 //! The Ternitor mark: the Node hexagon with a red X badged into its lower
-//! corner, on a dark tile.
+//! corner.
 //!
 //! Node's shape, because the window Ternitor hides is almost always a `node`
 //! process being handed a console it never asked for; the X is the app's job.
-//! The X is knocked back out of the hexagon by a ring of tile, so it reads as a
-//! badge without needing a border of its own.
+//! The X is knocked back out of the hexagon by a ring cut clean through it, so
+//! the badge reads on a dark taskbar and on a light one without a border of its
+//! own -- and without a plate behind the mark, which there is not.
 //!
 //! **This file is the only definition of the mark.** It is pure geometry over
 //! pure `std`, with no Win32 in it, for one reason: `build.rs` pulls it in with
@@ -21,28 +22,25 @@
 //
 // Unit space: every constant is a fraction of the icon's edge, so one set of
 // numbers serves 16px and 256px alike.
-
-/// Corner radius of the tile.
-const TILE_R: f64 = 0.225;
+//
+// The mark has no tile under it, so the geometry carries its own framing: these
+// are the numbers for the mark's bounding box -- hexagon plus the badge's reach
+// -- scaled and centred to fill the icon with a 0.05 margin on every side. Move
+// one and the others have to be recomputed, or the mark drifts off centre inside
+// its own icon.
 
 /// The hexagon: pointy-top, so its vertices run top then clockwise.
-const HEX_CX: f64 = 0.455;
-const HEX_CY: f64 = 0.44;
-const HEX_R: f64 = 0.335; // circumradius: centre to vertex
+const HEX_CX: f64 = 0.438;
+const HEX_CY: f64 = 0.466;
+const HEX_R: f64 = 0.416; // circumradius: centre to vertex
 
 /// The X badge. It straddles the hexagon's lower-right edge, so the knock-back
 /// bites the corner rather than sitting beside it.
-const X_CX: f64 = 0.66;
-const X_CY: f64 = 0.645;
-const X_ARM: f64 = 0.132; // half the badge's extent
-const X_HALF: f64 = 0.053; // half the stroke width
-const X_GAP: f64 = 0.027; // tile showing between hexagon and X
-
-/// Tile, top to bottom. Darker than a taskbar in either Windows theme, so the
-/// silhouette holds, but not pure black: the hexagon and the X are the only
-/// colour on it.
-const TILE_TOP: Rgb = (0x1B as f64, 0x1F as f64, 0x21 as f64);
-const TILE_BOTTOM: Rgb = (0x09 as f64, 0x0B as f64, 0x0C as f64);
+const X_CX: f64 = 0.692;
+const X_CY: f64 = 0.720;
+const X_ARM: f64 = 0.164; // half the badge's extent
+const X_HALF: f64 = 0.066; // half the stroke width
+const X_GAP: f64 = 0.033; // hexagon cut away between the stroke and the rest
 
 /// Node green, light at the top-left of the hexagon to dark at the bottom-right.
 const HEX_LIGHT: Rgb = (106.0, 191.0, 75.0);
@@ -97,18 +95,8 @@ fn inside_hexagon(v: &[(f64, f64); 6], p: (f64, f64)) -> bool {
     true
 }
 
-/// The rounded tile: clamp into the inner rect, then ask whether the point is
-/// within the corner radius of where it landed.
-fn inside_tile(s: f64, p: (f64, f64)) -> bool {
-    let r = TILE_R * s;
-    let cx = p.0.clamp(r, s - r);
-    let cy = p.1.clamp(r, s - r);
-    let (dx, dy) = (p.0 - cx, p.1 - cy);
-    dx * dx + dy * dy <= r * r
-}
-
-/// The X badge's two strokes, at a given half-width. Both the red X and its
-/// knock-back are this shape at different widths.
+/// The X badge's two strokes, at a given half-width. Both the red X and the ring
+/// cut out of the hexagon are this shape at different widths.
 fn on_x(s: f64, p: (f64, f64), half_w: f64) -> bool {
     let x0 = (X_CX - X_ARM) * s;
     let x1 = (X_CX + X_ARM) * s;
@@ -153,48 +141,53 @@ fn hexagon_box(s: f64) -> (f64, f64, f64, f64) {
 
 /// The mark as a `size` x `size` BGRA buffer, ready for `CreateIcon` or for an
 /// `.ico` entry.
+///
+/// Three layers, composited as coverage rather than painted in order: the green
+/// hexagon, the ring cut clean out of it around the badge, and the red X over
+/// both. The cut has to be *transparent* rather than repainted, because there is
+/// no tile behind the mark to repaint it with -- so the ring subtracts from the
+/// hexagon's alpha and the X then goes over what is left.
 pub fn render_pixels(size: i32) -> Vec<u8> {
     let s = size as f64;
     let v = hexagon_vertices(s);
     let (bx, by, bw, bh) = hexagon_box(s);
+    let cut = (X_HALF + X_GAP) * s;
+    let stroke = X_HALF * s;
 
     let mut out = vec![0u8; (size * size * 4) as usize];
     for y in 0..size {
-        let ty = (y as f64 + 0.5) / s;
         for x in 0..size {
-            // Outside the tile is transparent, and nothing else is drawn there.
-            let a = cover(x, y, &|px, py| inside_tile(s, (px, py)));
-            if a <= 0.0 {
+            // Down the diagonal of the hexagon's own box, so the grade spans the
+            // shape rather than the icon.
+            let t = ((x as f64 + 0.5 - bx) + (y as f64 + 0.5 - by)) / (bw + bh);
+            let hex_c = mix(HEX_LIGHT, HEX_DARK, t.clamp(0.0, 1.0));
+
+            let hex = cover(x, y, &|px, py| inside_hexagon(&v, (px, py)));
+            let ring = cover(x, y, &|px, py| on_x(s, (px, py), cut));
+            // The cut comes out of the hexagon, and only out of the hexagon: the
+            // ring does not erase the badge it is there to separate.
+            let a = hex * (1.0 - ring);
+            let k = cover(x, y, &|px, py| on_x(s, (px, py), stroke));
+
+            // The X is the top layer, so the "over" is driven by its coverage:
+            // where it is fully opaque the colour is its own, whatever the
+            // hexagon underneath was doing.
+            let inv = 1.0 - k;
+            let ao = k + a * inv;
+            if ao <= 0.0 {
                 continue;
             }
-
-            let base = mix(TILE_TOP, TILE_BOTTOM, ty);
-            let mut c = base;
-
-            let h = cover(x, y, &|px, py| inside_hexagon(&v, (px, py))) * a;
-            if h > 0.0 {
-                // Down the diagonal of the hexagon's own box, so the grade spans
-                // the shape rather than the tile.
-                let t = ((x as f64 + 0.5 - bx) + (y as f64 + 0.5 - by)) / (bw + bh);
-                c = mix(c, mix(HEX_LIGHT, HEX_DARK, t.clamp(0.0, 1.0)), h);
-            }
-
-            // The knock-back: tile again, over the hexagon, in the X's shape.
-            let g = cover(x, y, &|px, py| on_x(s, (px, py), (X_HALF + X_GAP) * s)) * a;
-            if g > 0.0 {
-                c = mix(c, base, g);
-            }
-
-            let k = cover(x, y, &|px, py| on_x(s, (px, py), X_HALF * s)) * a;
-            if k > 0.0 {
-                c = mix(c, X_RED, k);
-            }
+            let c = (
+                (X_RED.0 * k + hex_c.0 * a * inv) / ao,
+                (X_RED.1 * k + hex_c.1 * a * inv) / ao,
+                (X_RED.2 * k + hex_c.2 * a * inv) / ao,
+            );
 
             let o = ((y * size + x) * 4) as usize;
             out[o] = c.2.round() as u8;
             out[o + 1] = c.1.round() as u8;
             out[o + 2] = c.0.round() as u8;
-            out[o + 3] = (a * 255.0).round() as u8;
+            out[o + 3] = (ao * 255.0).round() as u8;
         }
     }
     out
@@ -233,8 +226,8 @@ pub fn ico() -> Vec<u8> {
 }
 
 /// One icon image: a 32bpp bottom-up DIB with an empty AND mask, which is what
-/// an `.ico` entry holds. The alpha channel is what makes the tile's corners
-/// transparent; the mask is vestigial and Windows still expects its bytes.
+/// an `.ico` entry holds. The alpha channel is what makes the space around the
+/// mark transparent; the mask is vestigial and Windows still expects its bytes.
 fn dib(size: i32) -> Vec<u8> {
     let px = render_pixels(size);
     let row = (size * 4) as usize;
@@ -273,6 +266,10 @@ fn push_u32(out: &mut Vec<u8>, v: u32) {
 /// The mark as SVG, at the same proportions the raster uses. Generated, not
 /// hand-written: it is another view of these constants, and the test below
 /// fails if the committed copy stops matching them.
+///
+/// The knock-back is a `mask` on the hexagon rather than a stroke painted in a
+/// background colour, which is what makes the gap transparent in both renderings
+/// instead of only in the raster.
 pub fn svg() -> String {
     let s = 256.0;
     let (bx, by, bw, bh) = hexagon_box(s);
@@ -290,15 +287,10 @@ pub fn svg() -> String {
     let y1 = (X_CY + X_ARM) * s;
     let strokes = format!("M{x0:.2} {y0:.2}L{x1:.2} {y1:.2}M{x0:.2} {y1:.2}L{x1:.2} {y0:.2}");
 
-    let (tile_top, tile_bottom) = (hex(TILE_TOP), hex(TILE_BOTTOM));
     format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {s} {s}" width="{s}" height="{s}" role="img" aria-labelledby="t">
   <title id="t">Ternitor</title>
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="{s}" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="{tile_top}"/>
-      <stop offset="1" stop-color="{tile_bottom}"/>
-    </linearGradient>
     <linearGradient id="node" x1="{bx:.2}" y1="{by:.2}" x2="{bx2:.2}" y2="{by2:.2}" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="{hex_light}"/>
       <stop offset="1" stop-color="{hex_dark}"/>
@@ -308,7 +300,6 @@ pub fn svg() -> String {
       <path d="{strokes}" stroke="#000" stroke-width="{gap_w:.2}" stroke-linecap="round" fill="none"/>
     </mask>
   </defs>
-  <rect width="{s}" height="{s}" rx="{radius:.2}" fill="url(#tile)"/>
   <polygon points="{points}" fill="url(#node)" mask="url(#knock)"/>
   <path d="{strokes}" stroke="{x_red}" stroke-width="{x_w:.2}" stroke-linecap="round" fill="none"/>
 </svg>
@@ -316,7 +307,6 @@ pub fn svg() -> String {
         bx2 = bx + d,
         by2 = by + d,
         points = points.join(" "),
-        radius = TILE_R * s,
         gap_w = 2.0 * (X_HALF + X_GAP) * s,
         x_w = 2.0 * X_HALF * s,
         hex_light = hex(HEX_LIGHT),
@@ -337,33 +327,105 @@ mod tests {
 
     const SVG: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.svg");
 
-    fn at(size: i32, x: i32, y: i32) -> [u8; 4] {
+    /// Render once, sample anywhere: the checks below ask for several pixels of
+    /// the same image, and rendering is not free.
+    fn frame(size: i32) -> impl Fn(i32, i32) -> [u8; 4] {
         let px = render_pixels(size);
-        let o = ((y * size + x) * 4) as usize;
-        [px[o], px[o + 1], px[o + 2], px[o + 3]]
+        move |x, y| {
+            let o = ((y * size + x) * 4) as usize;
+            [px[o], px[o + 1], px[o + 2], px[o + 3]]
+        }
     }
+
+    /// A pixel far enough inside the hexagon, up and left of the badge, that
+    /// neither the badge nor the ring cut around it can reach.
+    const GREEN_AT: (f64, f64) = (0.25, 0.28);
 
     #[test]
     fn the_hexagon_is_drawn_and_the_corners_are_empty() {
-        // Up and left of the badge, which is where the hexagon is untouched.
-        let green = at(32, 11, 11);
-        assert_eq!(green[3], 255, "the tile is opaque: {green:?}");
+        let at = frame(32);
+        let x = (GREEN_AT.0 * 32.0) as i32;
+        let y = (GREEN_AT.1 * 32.0) as i32;
+        let green = at(x, y);
+        assert_eq!(green[3], 255, "the hexagon is opaque here: {green:?}");
         assert!(
             green[1] > green[0] && green[1] > green[2],
             "the hexagon should be green here: {green:?}"
         );
-        assert_eq!(at(32, 0, 0)[3], 0, "top-left corner is outside the tile");
-        assert_eq!(at(32, 0, 31)[3], 0, "bottom-left corner is outside the tile");
+        assert_eq!(at(0, 0)[3], 0, "top-left corner is outside the mark");
+        assert_eq!(at(0, 31)[3], 0, "bottom-left corner is outside the mark");
+        assert_eq!(at(31, 0)[3], 0, "top-right corner is outside the mark");
     }
 
     /// The badge is the point of the mark, so it is worth a pixel: the X sits
-    /// over the hexagon, and the knock-back is what keeps it legible there.
+    /// over the hexagon, and the ring cut around it is what keeps it legible.
     #[test]
     fn the_x_is_red_over_the_hexagon() {
-        let badge = at(32, (X_CX * 32.0) as i32, (X_CY * 32.0) as i32);
+        let at = frame(32);
+        let badge = at((X_CX * 32.0) as i32, (X_CY * 32.0) as i32);
         assert!(
             badge[2] > 150 && badge[1] < 90 && badge[3] == 255,
             "the badge centre should be red: {badge:?}"
+        );
+    }
+
+    /// The knock-back removes the hexagon rather than painting over it. With no
+    /// tile behind the mark there is nothing else it could be: a gap that was
+    /// painted would have to be painted *something*.
+    #[test]
+    fn the_ring_around_the_badge_is_cut_clean_out() {
+        let s = 128;
+        let at = frame(s);
+        // Between the badge's stroke and the rest of the hexagon: offset from the
+        // badge's centre at right angles to the diagonal, so the distance to both
+        // strokes is the same and lands inside the ring but outside the stroke.
+        let cut = at((0.577 * s as f64) as i32, (0.720 * s as f64) as i32);
+        assert_eq!(cut[3], 0, "the ring should be transparent: {cut:?}");
+        // And the hexagon a little further out from it is still solid.
+        let green = at((GREEN_AT.0 * s as f64) as i32, (GREEN_AT.1 * s as f64) as i32);
+        assert_eq!(green[3], 255, "the hexagon beside the ring is opaque: {green:?}");
+    }
+
+    /// The mark has no tile, so nothing else frames it: it has to fill the icon
+    /// it is drawn in, or it floats small and off-centre. This is the test that
+    /// fails when a constant is nudged and the bounding box stops being centred
+    /// -- which the constants above cannot be moved without.
+    #[test]
+    fn the_mark_fills_its_icon_and_sits_centred() {
+        let s = 128;
+        let px = render_pixels(s);
+        let alpha = |x: i32, y: i32| px[((y * s + x) * 4 + 3) as usize];
+
+        let (mut l, mut r, mut t, mut b) = (s, -1, s, -1);
+        for y in 0..s {
+            for x in 0..s {
+                if alpha(x, y) > 0 {
+                    l = l.min(x);
+                    r = r.max(x);
+                    t = t.min(y);
+                    b = b.max(y);
+                }
+            }
+        }
+        let n = s as f64;
+        assert!(r >= 0, "the mark rendered nothing at all");
+        for (edge, margin) in [("left", l as f64), ("top", t as f64)] {
+            assert!(margin / n < 0.10, "the {edge} edge leaves {margin} of {s} empty");
+        }
+        for (edge, margin) in [("right", n - r as f64), ("bottom", n - b as f64)] {
+            assert!(margin / n < 0.10, "the {edge} edge leaves {margin} of {s} empty");
+        }
+        let centre_x = (l + r) as f64 / 2.0;
+        let centre_y = (t + b) as f64 / 2.0;
+        assert!(
+            (centre_x - n / 2.0).abs() / n < 0.02,
+            "not centred horizontally: centre is {centre_x}, mid is {}",
+            n / 2.0
+        );
+        assert!(
+            (centre_y - n / 2.0).abs() / n < 0.02,
+            "not centred vertically: centre is {centre_y}, mid is {}",
+            n / 2.0
         );
     }
 

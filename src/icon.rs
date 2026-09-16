@@ -3,7 +3,7 @@
 //! The shape itself lives in `mark`, because `build.rs` bakes the executable's
 //! `.ico` from the same arithmetic. What is left here is the handle: a 32bpp XOR
 //! bitmap with a NULL AND mask, where the alpha channel in the buffer is what
-//! makes the tile's corners transparent.
+//! makes everything outside the mark transparent.
 
 use windows::Win32::UI::WindowsAndMessaging::{CreateIcon, DestroyIcon, HICON};
 

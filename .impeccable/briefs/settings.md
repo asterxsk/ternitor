@@ -46,6 +46,19 @@ sprocket components, and the reduced-motion path — the surface no longer anima
 at all. The instrument framing above is what survives; DESIGN.md is the current
 record.
 
+**AMENDMENT (2026-09-16).** The dark tile under the app mark was cut at the
+owner's direction, so the paragraph above describes a plate that is no longer
+there. The mark is now the hexagon and the badge alone: the X is separated from
+the hexagon by a ring knocked straight out of it, which is transparent rather
+than painted, because with no tile behind the mark there is nothing to paint a
+gap with. The constants were recomputed for the mark's own bounding box so it
+still fills its icon and sits centred, and the caption of the settings window
+now wears it too (`ui.rs` registers the class with `WNDCLASSEXW { hIcon, hIconSm }`
+where `WNDCLASSW` had left both null). Verified on the live window: the class
+carries a 16px and a 32px icon, both reading green and red with transparent
+corners, and a `PrintWindow` of the caption draws the hexagon and the X.
+`assets/icon.svg` regenerated from the same constants.
+
 **FORM.** Chosen: the user's pick from the served decision page, **Cutting Bench
 Rail** (`challenger-cutting-bench`), a competitive challenger against the run's
 assigned *Drafting Plate*, over the model pick *Windows 11 Settings Page*. The

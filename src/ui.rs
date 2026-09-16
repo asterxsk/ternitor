@@ -45,14 +45,16 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DefWindowProcW, DestroyWindow,
-    GetClientRect, GetCursorPos, IDC_ARROW, IDC_HAND, LoadCursorW, MINMAXINFO, RegisterClassW,
-    SetCursor, SetForegroundWindow, SetWindowPos, ShowWindow, SW_HIDE, SW_SHOWNORMAL,
-    SWP_NOACTIVATE, SWP_NOZORDER, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND,
-    WM_GETMINMAXINFO, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_SETFOCUS,
-    WM_SETCURSOR, WNDCLASSW, WINDOW_EX_STYLE, WINDOW_STYLE, WS_CAPTION, WS_MINIMIZEBOX, WS_SYSMENU,
+    GetClientRect, GetCursorPos, GetSystemMetrics, IDC_ARROW, IDC_HAND, LoadCursorW, MINMAXINFO,
+    RegisterClassExW, SetCursor, SetForegroundWindow, SetWindowPos, ShowWindow, SM_CXICON,
+    SM_CXSMICON, SW_HIDE, SW_SHOWNORMAL, SWP_NOACTIVATE, SWP_NOZORDER, WM_ACTIVATE, WM_CLOSE,
+    WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND, WM_GETMINMAXINFO, WM_KEYDOWN, WM_LBUTTONDOWN,
+    WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_SETFOCUS, WM_SETCURSOR, WNDCLASSEXW,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WS_CAPTION, WS_MINIMIZEBOX, WS_SYSMENU,
 };
 
 use crate::app::{self, Snapshot};
+use crate::icon;
 use crate::theme::{self, Fonts, Palette, Rgb};
 use crate::win::{instance, pcw, wide};
 
@@ -82,10 +84,18 @@ const TOGGLE_Y: i32 = 164;
 const TOGGLE_W: i32 = 64;
 const TOGGLE_H: i32 = 36;
 
-/// The quit button, in the right corner of the footer.
+/// The quit button, in the right corner of the footer. Its label shares the
+/// footer's y with the version and log lines, and the plate is centred on the
+/// row's middle, which is what puts the button on the row instead of floating
+/// above it.
 const QUIT_W: i32 = 88;
 const QUIT_H: i32 = 28;
-const QUIT_TOP: i32 = 288;
+const QUIT_TOP: i32 = 294;
+
+/// The footer's text row: the version line, the log hint and the quit label
+/// all start here, which is what makes the footer read as one row. One
+/// constant, so the three cannot drift apart.
+const FOOTER_Y: f32 = 302.0;
 
 /// The quit button sits under the footer rule and inside the sheet. Both are
 /// constants, so this is settled at compile time rather than at run time.
@@ -614,6 +624,8 @@ fn draw_autostart(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui
 /// Quit. Last thing in the reading order, in the corner where a way out belongs,
 /// and drawn only once the user has found it on purpose.
 fn draw_quit(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui) {
+    // The one rect everywhere: hit-testing, the log hint's stop-short and the
+    // plate itself all read `quit_rect`, so they cannot drift apart.
     let r = quit_rect(p.s);
     let hot = ui.hover == Some(Control::Quit);
     let down = ui.pressed == Some(Control::Quit);
@@ -637,12 +649,13 @@ fn draw_quit(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui) {
         pal.body
     };
     // Centred by hand rather than with DrawTextW, which has nowhere to put the
-    // edge printing's tracking.
+    // edge printing's tracking. Same top as the version and log lines: the
+    // footer reads as one row because its texts share one y.
     let w = p.measure("QUIT", fonts.label, theme::LABEL_TRACKING);
     p.text(
         "QUIT",
         (r.left + r.right - w) / 2,
-        (r.top + r.bottom) / 2 - p.d(7.0),
+        p.d(FOOTER_Y),
         fonts.label,
         ink,
         theme::LABEL_TRACKING,
@@ -744,14 +757,14 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
         std::env::consts::OS,
         std::env::consts::ARCH
     );
-    p.text(&info, left, p.d(302.0), fonts.mono, pal.dim, 0.0);
+    p.text(&info, left, p.d(FOOTER_Y), fonts.mono, pal.dim, 0.0);
 
     draw_quit(p, pal, fonts, ui);
     // The log hint stops short of the button rather than running under it.
     p.text_right(
         "log: ternitor.log",
         quit_rect(p.s).left - p.d(24.0),
-        p.d(302.0),
+        p.d(FOOTER_Y),
         fonts.mono,
         pal.dim,
         0.0,
@@ -1094,14 +1107,26 @@ fn create() -> Result<HWND, String> {
     let style = WINDOW_STYLE(WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0);
     let cursor = unsafe { LoadCursorW(None, IDC_ARROW) }.unwrap_or_default();
 
-    let wc = WNDCLASSW {
+    // The caption's icon and the one the task switcher asks for. A class icon is
+    // a handle the system reads later rather than a copy, so both have to outlive
+    // the window -- and there is one window, living as long as the process, which
+    // is why these are never freed. The alternative is a struct whose only job is
+    // to hold two handles until exit, to release resources the process is about
+    // to release anyway.
+    let big = icon::hicon(unsafe { GetSystemMetrics(SM_CXICON) });
+    let small = icon::hicon(unsafe { GetSystemMetrics(SM_CXSMICON) });
+
+    let wc = WNDCLASSEXW {
+        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
         lpfnWndProc: Some(sheet_proc),
         hInstance: instance(),
         hCursor: cursor,
+        hIcon: big,
+        hIconSm: small,
         lpszClassName: pcw(&class),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    unsafe { RegisterClassExW(&wc) };
 
     let (ow, oh) = outer_size(theme::scale_for_system());
 
@@ -1351,6 +1376,18 @@ mod tests {
             "the log hint would run back to {} and the left margin is {PAD}",
             hint_right - hint
         );
+    }
+
+    /// The quit button sits on the footer's text row rather than floating above
+    /// it: the plate's bottom edge sits on the sheet's bottom content edge, and
+    /// the shared footer y drops the 12px label cell 8px into the 28px plate, so
+    /// the label is centred in the plate while reading as one row with the
+    /// version and log lines. Pinned, not derived: move any of the three and
+    /// re-measure the row rather than updating this to match.
+    #[test]
+    fn the_quit_button_sits_on_the_footer_row() {
+        assert_eq!(QUIT_TOP + QUIT_H, H - PAD / 2);
+        assert_eq!(FOOTER_Y as i32 - QUIT_TOP, 8);
     }
 }
 

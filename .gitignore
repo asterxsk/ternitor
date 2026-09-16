@@ -7,3 +7,6 @@
 # Review rasters. The design record they belong to (PROVENANCE.md, DESIGN.md)
 # is versioned; the captures themselves are not.
 /.impeccable/review/*.png
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

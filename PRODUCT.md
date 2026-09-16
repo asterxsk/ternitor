@@ -83,8 +83,9 @@ consoles, so nothing is hiding its own at boot.
   `install.ps1` puts it in `%LOCALAPPDATA%\Programs\Ternitor` with a Start Menu
   shortcut, the `Run` value, and an `HKCU\...\Uninstall` entry so it appears in
   Settings > Apps, where `uninstall.ps1` removes all of it.
-- The app mark (a Node hexagon with a red X, on a dark tile) is defined once in
-  `src/mark.rs`; `build.rs` bakes the exe's `.ico` from it at build time and
+- The app mark (a Node hexagon with a red X badged into its lower corner, the X
+  separated by a ring cut clean through the hexagon and no tile under either) is
+  defined once in `src/mark.rs`; `build.rs` bakes the exe's `.ico` from it and
   `assets/icon.svg` is generated from the same constants, so the tray, the exe
   icon and the SVG cannot drift apart. Replaced the ported PowerShell mark on
   2026-09-16, which retires the old byte-identical-at-16px parity claim.
@@ -99,7 +100,7 @@ consoles, so nothing is hiding its own at boot.
 
 - `src/` -- the only implementation. `janitor.rs` holds the detection and
   deferred re-show, `ui.rs` the settings surface, `mark.rs` the app mark (Node
-  hexagon + red X on a dark tile), `icon.rs` the Win32 handle over it.
+  hexagon + red X, no tile), `icon.rs` the Win32 handle over it.
 - `PRIVACY.md` and `TERMS.md` -- added 2026-09-16 at the user's request. The
   privacy statement is factual (no network code, two registry values, one local
   log); the terms defer to MIT rather than manufacturing a contract, and say so.
