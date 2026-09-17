@@ -190,9 +190,10 @@ Bands, top to bottom:
 
 | Band | Logical | Contents |
 |---|---|---|
-| Head | 20–128 | Name and description left; counter right |
+| Head | 20–128 | Mark, name and description left; counter right |
 | Fields | 144–241 | Last cut, session clock left; the switch and its small print right |
-| Footer | 284–314 | Version and target left; the update plate and quit right |
+| Fields | 144–278 | Last cut, session clock and the two plates at 250–278 left; the switch and its small print right |
+| Footer | 284–314 | Version and target left, and nothing else |
 
 The two columns are 44–474 and 452–676, and they overlap because the paragraph
 and the counter never share a line. The paragraph's three lines are held to a
@@ -221,7 +222,8 @@ Rectangles and one round. The counter housing, its wheels and the rules are all
 rectangular with square corners: this is cut metal.
 
 Two radii, and each says what a thing is. **4px** is a plate with its corners
-knocked off — the quit button, the only soft-cornered rectangle here. A **full
+knocked off — the two plates above the footer rule, the only soft-cornered
+rectangles here. A **full
 pill**, where the radius is half the height, is the switch track: the one form on
 the surface that is round in both axes, and therefore the only one that reads as
 something you throw rather than something you read. Cut is square; the switch
@@ -232,6 +234,13 @@ overshooting it at both ends, drawn to look waxy and by hand rather than as a
 vector line.
 
 ## Components
+
+**The mark.** Not drawn on the sheet at all: it is the window's own icon, in the
+caption, which is where a window keeps its mark — 32px on the class and 16px on
+the window for `ICON_SMALL`, both from `icon::hicon`, the same arithmetic that
+makes the tray icon and the exe's `.ico`. One definition of the mark, and the
+frame stops falling back to the stock application icon. The client area keeps its
+own margin, so the name starts where it always did.
 
 **The counter.** A mechanical counter's wheels: a bordered housing divided into
 40×58 cells, one digit each in `counter` type, zero-padded to at least three.
@@ -253,22 +262,24 @@ a channel; two that do not read as two outlines crossing.
 An armed switch is already at `ink` and so cannot answer the pointer with a
 colour; the **knob** answers instead. Pressing takes 2px of material off it in
 either state, and hovering over an armed switch gives 2px back. Feedback stays a
-mark. The control snaps between states; there is no slide. The keyboard shows a
-`dim` focus ring at a 4px offset.
+mark. The control snaps between states; there is no slide. The keyboard drives it
+as well, and nothing is drawn to say where the keyboard is.
 
 When the write behind it fails the switch simply stays where it was, and the small
 print below it stops describing the registry and states the reason and the state
 it is still in. It does not get to refuse silently.
 
-**The quit button.** 88×28 in the footer's right corner, 4px radius, `label` type
-centred by hand because `DrawTextW` has nowhere to put the tracking. Idle it is a
+**The quit button.** 88×28 in the left column at 240–328, under the clock
+readouts and *above* the footer rule, 4px radius, `label` type centred by hand
+because `DrawTextW` has nowhere to put the tracking. Idle it is a
 `body` outline with `body` text — it is the last thing in the reading order and
 should not compete with the switch. Hovered, both go to `ink`; pressed, the plate
 fills `ink` and the text drops to `ground`. The one control that ends the process
-says so before the button comes up, not after. `Tab` moves the focus ring between
-it and the switch; `Enter` or `Space` fires whichever the ring is on, so the way
-out is reachable without the pointer. It is the same exit as the tray menu's, and
-there is no confirmation on either — the app holds no unsaved state to lose.
+says so before the button comes up, not after. `Tab` walks it, the update plate
+and the switch; `Enter` or `Space` fires whichever holds the keyboard, so the way
+out is reachable without the pointer and without an outline being drawn to say
+where the keyboard is. It is the same exit as the tray menu's, and there is no
+confirmation on either — the app holds no unsaved state to lose.
 
 **The paused indicator.** Pause lives on the tray menu, but it changes what the
 counter means — a frozen figure with no explanation is the one lie this surface
@@ -277,7 +288,8 @@ by `NOT COUNTING` in `dim`, in place of `HIDDEN THIS SESSION`. It is an indicato
 not a control: there is still nothing to click.
 
 **The update plate.** 176×28, the same 4px plate as the quit button and drawn at
-the same weight, standing to its left in the footer. Its label is its state —
+the same weight, at the sheet's own left margin (44) with 20px between it and the
+quit plate so the two never touch. Its label is its state —
 `CHECK FOR UPDATES`, `CHECKING`, `UP TO DATE`, the version that is available, or
 the refusal — so an answer needs no second element to show itself, the way a
 refused switch states its reason in the small print already there. Resting it is
@@ -285,10 +297,11 @@ a `body` outline with `body` text, hovered it goes to `ink`, and while a check i
 in the air the text drops to `dim` and the plate stops answering. Pressed with an
 available version in hand, it opens the page that version is on.
 
-**The footer.** Version and target left; the update plate and the quit button
-right. The log hint that sat between them is gone: the tray menu already has
-*Open log*, and a footer is not the place to spend a control's width saying the
-same thing twice.
+**The footer.** Version and target left, and nothing else. The plates stand above
+the rule, so the footer's line keeps its own baseline instead of sharing it with
+two buttons — and the log hint that used to sit between them is gone, because the
+tray menu already has *Open log* and a footer is not the place to spend a
+control's width saying the same thing twice.
 
 ## Do's and Don'ts
 

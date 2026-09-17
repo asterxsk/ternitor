@@ -19,7 +19,8 @@ To do its job, Ternitor has to look at what is happening on your own desktop:
 - **Window class names and process command lines**, to tell a blank console that
   a console-less process spawned (which it hides) from a terminal you opened
   yourself (which it must never hide). The command line is how it checks for the
-  default-terminal broker's `-Embedding` flag.
+  default-terminal broker's `-Embedding` flag, and how it recognises a console
+  host whose window class it does not know.
 - **Window titles**, after the fact, to re-check a window it hid -- the window
   comes back only if the title is a shell's own: a directory it is sitting in, a
   prompt, an elevated console, or a shell by name.

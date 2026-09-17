@@ -84,7 +84,11 @@ consoles, so nothing is hiding its own at boot.
   no restore-shells toggle, no log toggle on the screen). Quit added 2026-09-16;
   the update check added 2026-09-17, and it is the only network code in the app
   and the only thing in it that is ever pressed to ask.
-- Event-driven (`SetWinEventHook`), never polling.
+- Event-driven (`SetWinEventHook`), never polling. A window it decides to keep is
+  suppressed, not chased: `WS_EX_NOACTIVATE`, `DWMWA_CLOAK` and `SW_HIDE` the
+  moment it exists, because an out-of-context show event arrives after the window
+  is already on screen -- measured at ten milliseconds of screen time and a
+  foreground taken per spawn before this, and 0 of 400 samples visible after.
 - No runtime dependency, config in the registry, log next to the exe. Still
   portable -- copy the folder anywhere -- and now also installable:
   `Ternitor-Setup.exe` (Inno Setup, built by `installer\build.ps1`) or

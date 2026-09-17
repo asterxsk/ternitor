@@ -44,12 +44,12 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_SPACE, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DI_NORMAL, DefWindowProcW, DestroyWindow,
-    DrawIconEx,
+    AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DefWindowProcW, DestroyWindow,
     GetClientRect, GetCursorPos, IDC_ARROW, IDC_HAND, LoadCursorW, MINMAXINFO, RegisterClassW,
-    SetCursor, SetForegroundWindow, SetWindowPos, ShowWindow, SW_HIDE, SW_SHOWNORMAL,
+    SendMessageW, SetCursor, SetForegroundWindow, SetWindowPos, ShowWindow, SW_HIDE, SW_SHOWNORMAL,
     SWP_NOACTIVATE, SWP_NOZORDER, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND,
     WM_GETMINMAXINFO, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_SETFOCUS,
+    WM_SETICON,
     WM_SETCURSOR, WNDCLASSW, WINDOW_EX_STYLE, WINDOW_STYLE, WS_CAPTION, WS_MINIMIZEBOX, WS_SYSMENU,
 };
 
@@ -88,9 +88,10 @@ const TOGGLE_H: i32 = 36;
 /// The quit button, in the right corner of the footer.
 const QUIT_W: i32 = 88;
 const QUIT_H: i32 = 28;
-/// Both plates stand *above* the footer rule, so the footer line keeps its own
-/// baseline: a control level with a line of small print reads as loose type
-/// rather than as a button.
+/// Both plates stand above the footer rule, under the clock readouts in the left
+/// column: level with a line of small print they read as loose type rather than
+/// as buttons.
+const QUIT_X: i32 = 240;
 const QUIT_TOP: i32 = 250;
 
 /// The update control, to its left, in the space the log hint used to take. The
@@ -98,11 +99,17 @@ const QUIT_TOP: i32 = 250;
 /// network anything, and the widest its label ever gets is `CHECK FOR UPDATES`.
 const UPDATE_W: i32 = 176;
 const UPDATE_H: i32 = 28;
+const UPDATE_X: i32 = PAD;
 const UPDATE_TOP: i32 = 250;
 
 /// The plates sit clear of the small print above them and of the footer rule
 /// below. All of it is constant, so this is settled at compile time.
 const _: () = {
+    assert!(UPDATE_X + UPDATE_W < QUIT_X, "the two plates would touch");
+    assert!(
+        QUIT_X + QUIT_W <= W - PAD,
+        "the quit plate would run off the sheet"
+    );
     assert!(
         QUIT_TOP + QUIT_H <= 284,
         "the plates would cross into the footer"
@@ -517,21 +524,18 @@ fn toggle_rect(s: f32) -> RECT {
 
 fn quit_rect(s: f32) -> RECT {
     RECT {
-        left: theme::px((W - PAD - QUIT_W) as f32, s),
+        left: theme::px(QUIT_X as f32, s),
         top: theme::px(QUIT_TOP as f32, s),
-        right: theme::px((W - PAD) as f32, s),
+        right: theme::px((QUIT_X + QUIT_W) as f32, s),
         bottom: theme::px((QUIT_TOP + QUIT_H) as f32, s),
     }
 }
 
 fn update_rect(s: f32) -> RECT {
-    let quit = quit_rect(s);
-    let gap = theme::px(24.0, s);
-    let width = theme::px(UPDATE_W as f32, s);
     RECT {
-        left: quit.left - gap - width,
+        left: theme::px(UPDATE_X as f32, s),
         top: theme::px(UPDATE_TOP as f32, s),
-        right: quit.left - gap,
+        right: theme::px((UPDATE_X + UPDATE_W) as f32, s),
         bottom: theme::px((UPDATE_TOP + UPDATE_H) as f32, s),
     }
 }
@@ -716,35 +720,9 @@ fn update_label(state: &update::State) -> String {
 fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &Ui) {
     let left = p.d(PAD as f32);
 
-    // The mark in the corner, with the name standing beside it: the surface is a
-    // plate, and a plate carries its maker's stamp.
-    let mark = p.d(36.0);
-    let icon = icon::hicon(mark);
-    if !icon.is_invalid() {
-        unsafe {
-            let _ = DrawIconEx(
-                p.hdc,
-                left,
-                p.d(20.0),
-                icon,
-                mark,
-                mark,
-                0,
-                None,
-                DI_NORMAL,
-            );
-        }
-        icon::destroy(icon);
-    }
-
-    p.text(
-        "Ternitor",
-        left + p.d(48.0),
-        p.d(20.0),
-        fonts.title,
-        pal.ink,
-        0.0,
-    );
+    // The mark is not drawn here. It is the window's own icon, in the caption,
+    // where a window keeps its mark -- see `create`.
+    p.text("Ternitor", left, p.d(20.0), fonts.title, pal.ink, 0.0);
     for (i, line) in [
         "Hides the blank console windows Windows opens for processes that",
         "have no console of their own \u{2014} hidden the instant they appear,",
@@ -1200,6 +1178,9 @@ fn create() -> Result<HWND, String> {
         lpfnWndProc: Some(sheet_proc),
         hInstance: instance(),
         hCursor: cursor,
+        // The big one lives on the class, so the caption, the alt-tab tile and
+        // the tray agree: one definition of the mark, in `mark.rs`.
+        hIcon: icon::hicon(32),
         lpszClassName: pcw(&class),
         ..Default::default()
     };
@@ -1224,6 +1205,21 @@ fn create() -> Result<HWND, String> {
         )
     }
     .map_err(|e| format!("CreateWindowExW failed: {e}"))?;
+
+    // `WNDCLASSW` carries the big icon only; the caption's small one is a window
+    // property (`ICON_SMALL`), set here so the frame does not fall back to the
+    // stock application icon.
+    unsafe {
+        let small = icon::hicon(16);
+        if !small.is_invalid() {
+            let _ = SendMessageW(
+                hwnd,
+                WM_SETICON,
+                Some(WPARAM(0)),
+                Some(LPARAM(small.0 as isize)),
+            );
+        }
+    }
 
     apply_caption(hwnd);
     Ok(hwnd)

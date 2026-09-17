@@ -75,8 +75,8 @@ shortcut, the `Run` value and that entry — through the installer's own uninsta
 
 | | |
 |---|---|
-| **Hides the window** | Before it paints, not after — no flash, no flicker in the taskbar |
-| **Takes the focus back** | A hidden console can still activate itself; Windows Terminal wakes its handoff window again as the client attaches, seconds later, without showing anything. It is hidden again and the foreground goes back to the window that last really had it |
+| **Never drawn** | The window is suppressed the moment it exists — cloaked by the compositor, forbidden to activate, and hidden — so a console nobody asked for is never on screen, not even for one frame |
+| **Takes the focus back** | Whatever takes the foreground anyway — Windows Terminal wakes its handoff window again as the client attaches, seconds later — is hidden again and the foreground handed back to the window that last really had it |
 | **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked 600ms in and given back, without activation, only when its title is a shell's own — a directory it is sitting in, a prompt, an elevated console, or a shell by name. `npm` naming itself is not one |
 | **Counts its work** | The settings screen carries a live count of what it has hidden this session, and the title of the last one |
 | **Refuses to grow** | Five things on the settings screen and nothing else — a switch, the counter, an update check, app info, and a way out. Everything that is not one of those lives on the tray menu |
@@ -94,7 +94,7 @@ agent spawns a child ─▶ new console, no window yet ─▶ default-terminal b
                         owning process command line contains -Embedding?
                                 │
                                 ▼
-                     hidden before it is drawn
+              suppressed: cloaked, unactivatable, hidden
                                 │
         takes the foreground while hidden ─▶ hidden again,
                                              focus handed back
@@ -106,6 +106,14 @@ on `EVENT_SYSTEM_FOREGROUND` watches who has focus. A window is hidden only if i
 `-Embedding` — a flag set by the default-terminal broker and nothing else, read with
 `NtQueryInformationProcess`. Matching the window *title* does not work: at creation time it is still
 the broker's placeholder, and only later becomes the client's path.
+
+Hiding after the fact is a race the hook cannot win. The window is created hidden and shown later by
+the terminal that owns it, and an out-of-context show event arrives *after* that: about ten
+milliseconds of screen time and a foreground taken, on every spawn. So the window is taken out of
+circulation while it is still invisible — `WS_EX_NOACTIVATE` so it cannot take the foreground,
+`DWMWA_CLOAK` so the compositor never draws it whatever the window believes about being visible, and
+`SW_HIDE` for anything that asks the window itself. Measured against the same spawn that used to
+flash: 0 of 400 samples found it on screen.
 
 The foreground hook is the second half. A window that has already been hidden can be activated anyway,
 which moves focus whether or not anything is on screen and leaves you typing into a window you cannot
