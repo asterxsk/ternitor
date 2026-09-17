@@ -15,10 +15,11 @@ wins.
 - **Hiding a window is best effort.** Ternitor hides console windows it decides
   were spawned by a console-less process, and it can be wrong in both
   directions: it may miss a window, or hide one you wanted. It re-checks every
-  window it hides and gives back any whose title turns out to be a real shell,
-  and it hides again anything that activates itself while hidden, returning the
-  foreground to the window that last had it, but there is no guarantee. If a
-  window you need disappears, use *Pause hiding* on the tray menu.
+  window it hides and gives back only those whose title is a shell's own -- a
+  directory, a prompt, an elevated console, or a shell by name -- and it hides
+  again anything that activates itself while hidden, returning the foreground to
+  the window that last had it, but there is no guarantee. If a window you need
+  disappears, use *Pause hiding* on the tray menu.
 - **It is not a security product.** It does not sandbox anything, does not
   inspect what other processes do, and is not a substitute for antivirus,
   endpoint protection, or an approval step.

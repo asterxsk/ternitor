@@ -457,8 +457,8 @@ fn is_unwanted(hwnd: HWND) -> bool {
 enum Verdict {
     /// No title yet, or still Windows Terminal's placeholder.
     Undecided,
-    /// A blank console: the executable the client is, or the command line it was
-    /// started with. Text the spawner wrote, not a person.
+    /// Text the spawner wrote: the executable the client is, the command line it
+    /// was started with, or the name a program gave itself.
     StayHidden,
     /// Something a person asked for, which has to be given back.
     Restore,
@@ -468,10 +468,78 @@ fn classify(title: &str) -> Verdict {
     if is_undecided_title(title) {
         Verdict::Undecided
     } else if is_bare_exe_path(title) || is_command_line(title) {
+        // The broker's and the spawner's own text, and it wins over everything
+        // below: an `Administrator: ...` prefix is the one shell title that
+        // starts with a path, and it is caught by name before this.
         Verdict::StayHidden
-    } else {
+    } else if is_shell_title(title) {
         Verdict::Restore
+    } else {
+        // Anything else -- `npm`, `git`, a program naming itself -- is a program
+        // talking, not a person. Deliberately narrow: the wide version of this
+        // gave back an `npm update` window on 2026-09-17, and in two days of
+        // logs it never once gave back a shell that was wanted.
+        Verdict::StayHidden
     }
+}
+
+/// The shells that name themselves in a title.
+const SHELL_NAMES: &[&str] = &[
+    "Command Prompt",
+    "Windows PowerShell",
+    "PowerShell",
+    "pwsh",
+    "cmd",
+    "wsl",
+    "bash",
+    "zsh",
+    "fish",
+];
+
+/// Whether a title is one a person's shell writes and a program's would not.
+///
+/// The net is deliberately narrow. A shell in a handoff window is what this
+/// exists for, and the shapes below are the ones that only a shell produces: a
+/// directory it is sitting in, a prompt, an elevated console, or the shell's own
+/// name. A program's name -- `npm`, `cargo`, the title npm sets to its own
+/// command line -- is not one of them.
+fn is_shell_title(title: &str) -> bool {
+    let title = title.trim();
+    let first = title.split_whitespace().next().unwrap_or("");
+
+    // An elevated console says so, whatever is running inside it.
+    title.starts_with("Administrator: ")
+        // The directory a shell is sitting in, and nothing besides.
+        || is_directory_path(title)
+        // `user@host:~`, `user@host:/mnt/c/Users`: a prompt.
+        || is_prompt(title)
+        // A shell by name, and with its own arguments after it: `pwsh - node`.
+        || SHELL_NAMES
+            .iter()
+            .any(|name| title.eq_ignore_ascii_case(name) || first.eq_ignore_ascii_case(name))
+}
+
+/// A path to somewhere that is not a program: `C:\Users\me`, `C:/x`, `C:`,
+/// `\\wsl$\Ubuntu\home\me`, `~/projects`.
+fn is_directory_path(title: &str) -> bool {
+    let b = title.as_bytes();
+    if b.len() < 2 {
+        return false;
+    }
+
+    let pathlike = b[0] == b'~'
+        || (b[0] == b'\\' && b[1] == b'\\')
+        || (b[0].is_ascii_alphabetic() && b[1] == b':');
+    let exe = b.len() >= 4 && b[b.len() - 4..].eq_ignore_ascii_case(b".exe");
+
+    pathlike && !exe
+}
+
+/// `user@host:~` and `user@host:path`: the `@` has to arrive before the `:` and
+/// before any space, so a title that merely contains both does not read as one.
+fn is_prompt(title: &str) -> bool {
+    let head = title.split_whitespace().next().unwrap_or("");
+    matches!((head.find('@'), head.find(':')), (Some(at), Some(colon)) if at < colon)
 }
 
 /// Windows Terminal's own title, before it has been replaced by the client's.
@@ -650,10 +718,35 @@ mod tests {
             r"Administrator: C:\Windows\System32\cmd.exe",
             r"pwsh - node",
             r"C:\Windows\System32",
-            "notepad.exe",
+            r"C:\",
             "C:",
+            r"\\wsl$\Ubuntu\home\asterxsk",
+            "~/projects",
+            "asterxsk@desktop:~",
+            "asterxsk@desktop:/mnt/c/Users",
+            "Windows PowerShell",
+            "PowerShell 7 (x64)",
         ] {
             assert_eq!(classify(title), Verdict::Restore, "{title}");
+        }
+    }
+
+    /// The net is narrow on purpose: a program is not a shell, however friendly
+    /// its title reads. `npm` is the one that got away.
+    #[test]
+    fn program_names_are_not_shells() {
+        for title in [
+            "npm",
+            "npm --version",
+            "npm update cline",
+            "git",
+            "cargo",
+            "node",
+            "tsc --watch",
+            "notepad.exe",
+            "sumatrapdf",
+        ] {
+            assert_eq!(classify(title), Verdict::StayHidden, "{title}");
         }
     }
 
@@ -697,6 +790,32 @@ mod tests {
         assert!(!is_command_line("pwsh - node"));
         assert!(!is_command_line(r#""C:\Windows\System32" cmd"#));
         assert!(!is_command_line(""));
+    }
+
+    #[test]
+    fn a_shell_title_is_a_directory_a_prompt_or_a_shell() {
+        assert!(is_directory_path(r"C:\Users\asterxsk"));
+        assert!(is_directory_path("C:"));
+        assert!(is_directory_path(r"\\wsl$\Ubuntu\home"));
+        assert!(is_directory_path("~/projects"));
+        assert!(!is_directory_path(r"C:\Windows\System32\cmd.exe"));
+        assert!(!is_directory_path("notepad.exe"));
+        assert!(!is_directory_path("npm"));
+        assert!(!is_directory_path(""));
+
+        // The `@` has to arrive before the `:`, or a command line that merely
+        // contains both would read as a prompt.
+        assert!(is_prompt("asterxsk@desktop:~"));
+        assert!(is_prompt("me@host:/mnt/c"));
+        assert!(!is_prompt("npm -e user@example.com:x"));
+        assert!(!is_prompt("npm"));
+        assert!(!is_prompt(""));
+
+        assert!(is_shell_title("asterxsk@desktop:~"));
+        assert!(is_shell_title("Administrator: C:\\Windows\\System32\\cmd.exe"));
+        assert!(!is_shell_title("npm"));
+        assert!(!is_shell_title("npm update cline"));
+        assert!(!is_shell_title(""));
     }
 
     #[test]

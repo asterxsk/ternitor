@@ -16,8 +16,9 @@ To do its job, Ternitor has to look at what is happening on your own desktop:
   a console-less process spawned (which it hides) from a terminal you opened
   yourself (which it must never hide). The command line is how it checks for the
   default-terminal broker's `-Embedding` flag.
-- **Window titles**, after the fact, to re-check a window it hid -- a title that
-  turns out to be a real shell gets the window back.
+- **Window titles**, after the fact, to re-check a window it hid -- the window
+  comes back only if the title is a shell's own: a directory it is sitting in, a
+  prompt, an elevated console, or a shell by name.
 - **Which window has the foreground**, so it can be given back: a hidden window
   that activates itself is hidden again, and the foreground returns to the window
   that last really had it.

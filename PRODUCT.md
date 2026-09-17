@@ -55,12 +55,14 @@ decision, and the spawners are vendored hooks that cannot be edited.
 It hides only the windows that are structural artefacts of console-less spawners,
 identified by the default-terminal broker's `-Embedding` flag on the owning
 process -- not by process name, not by window title. A terminal the human opened
-is never touched, and anything hidden is re-checked and restored if its title
-reveals it was a real shell. The same holds the other way: a hidden window that
-activates itself is hidden again, and the foreground goes back to the window that
-last really had it, because a hidden window holding focus leaves the user typing
-into nothing. A tool that closed or hid "all terminal windows" could not
-truthfully copy that claim.
+is never touched, and anything hidden is re-checked and given back only when its
+title is a shell's own: a directory it is sitting in, a prompt, an elevated
+console, or a shell by name. A program naming itself -- `npm`, `cargo` -- is not
+a shell, which is how an `npm update` window got back in on 2026-09-17 and stayed
+on screen. The same holds the other way: a hidden window that activates itself is
+hidden again, and the foreground goes back to the window that last really had it,
+because a hidden window holding focus leaves the user typing into nothing. A tool
+that closed or hid "all terminal windows" could not truthfully copy that claim.
 
 ## Operating Context
 

@@ -77,7 +77,7 @@ shortcut, the `Run` value and that entry — through the installer's own uninsta
 |---|---|
 | **Hides the window** | Before it paints, not after — no flash, no flicker in the taskbar |
 | **Takes the focus back** | A hidden console can still activate itself; Windows Terminal wakes its handoff window again as the client attaches, seconds later, without showing anything. It is hidden again and the foreground goes back to the window that last really had it |
-| **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked and re-shown, without activation, once its title reveals it was a real shell |
+| **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked 600ms in and given back, without activation, only when its title is a shell's own — a directory it is sitting in, a prompt, an elevated console, or a shell by name. `npm` naming itself is not one |
 | **Counts its work** | The settings screen carries a live count of what it has hidden this session, and the title of the last one |
 | **Refuses to grow** | Four things on the settings screen and nothing else — a switch, the counter, app info, and a way out. Everything that is not one of those lives on the tray menu |
 | **Says nothing** | No network calls, no telemetry, no update check, no crash reporting |
