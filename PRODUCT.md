@@ -9,14 +9,14 @@ windows
 (Native Win32 desktop app. Not the `web | ios | android | adaptive` enum: it is a
 single-OS native surface, not a website and not one product adapting per OS.)
 
-The crate builds on any target -- the Win32 modules are behind `cfg(windows)` and
-`windows` is a Windows-only dependency -- and on Linux and macOS the binary says
-plainly that it has nothing to do there and exits. The defect it fixes is
+The crate builds on Windows only: there is no platform abstraction over the
+Win32 modules and `windows` is a plain dependency. The defect it fixes is
 Windows': a ConPTY client with no console spawns a child, the child gets a brand
 new console, and the default-terminal broker hands that console to Windows
 Terminal as a visible window. Nothing on Linux or macOS opens a terminal behind
 the user's back, so there is no `janitor` to port and no honest resident process
-to leave running. Decided 2026-09-16, over porting or doing nothing.
+to leave running. Decided 2026-09-16, over porting or doing nothing; the Linux and
+macOS stub was deleted 2026-09-17 rather than kept as a build that pretends.
 
 ## Stack
 
@@ -43,12 +43,12 @@ Windows Terminal as a blank window. The job being done when Ternitor matters is
 
 ## Product Purpose
 
-Keep agent-spawned console windows from ever appearing, so they cannot steal
-focus or break concentration. Success is the user forgetting it is running: no
-window ever appears, no notification, no required configuration. The app exists
-because the fix cannot live in the spawner -- window visibility is the spawner's
-`CREATE_NO_WINDOW` decision, and the spawners are vendored hooks that cannot be
-edited.
+Keep agent-spawned console windows from ever appearing, and take the focus back
+when one of them activates itself anyway, so neither can break concentration.
+Success is the user forgetting it is running: no window ever appears, no
+notification, no required configuration. The app exists because the fix cannot
+live in the spawner -- window visibility is the spawner's `CREATE_NO_WINDOW`
+decision, and the spawners are vendored hooks that cannot be edited.
 
 ## Positioning
 
@@ -56,8 +56,11 @@ It hides only the windows that are structural artefacts of console-less spawners
 identified by the default-terminal broker's `-Embedding` flag on the owning
 process -- not by process name, not by window title. A terminal the human opened
 is never touched, and anything hidden is re-checked and restored if its title
-reveals it was a real shell. A tool that closed or hid "all terminal windows"
-could not truthfully copy that claim.
+reveals it was a real shell. The same holds the other way: a hidden window that
+activates itself is hidden again, and the foreground goes back to the window that
+last really had it, because a hidden window holding focus leaves the user typing
+into nothing. A tool that closed or hid "all terminal windows" could not
+truthfully copy that claim.
 
 ## Operating Context
 
@@ -80,9 +83,10 @@ consoles, so nothing is hiding its own at boot.
 - Event-driven (`SetWinEventHook`), never polling.
 - No runtime dependency, config in the registry, log next to the exe. Still
   portable -- copy the folder anywhere -- and now also installable:
+  `Ternitor-Setup.exe` (Inno Setup, built by `installer\build.ps1`) or
   `install.ps1` puts it in `%LOCALAPPDATA%\Programs\Ternitor` with a Start Menu
-  shortcut, the `Run` value, and an `HKCU\...\Uninstall` entry so it appears in
-  Settings > Apps, where `uninstall.ps1` removes all of it.
+  shortcut, the `Run` value, and an entry in Settings > Apps, where the
+  installer's own uninstaller -- or `uninstall.ps1` -- removes all of it.
 - The app mark (a Node hexagon with a red X, on a dark tile) is defined once in
   `src/mark.rs`; `build.rs` bakes the exe's `.ico` from it at build time and
   `assets/icon.svg` is generated from the same constants, so the tray, the exe
@@ -97,14 +101,15 @@ consoles, so nothing is hiding its own at boot.
 
 ## Evidence on Hand
 
-- `src/` -- the only implementation. `janitor.rs` holds the detection and
-  deferred re-show, `ui.rs` the settings surface, `mark.rs` the app mark (Node
-  hexagon + red X on a dark tile), `icon.rs` the Win32 handle over it.
+- `src/` -- the only implementation. `janitor.rs` holds the detection, the
+  deferred re-show, and the foreground hook that takes focus back, `ui.rs` the
+  settings surface, `mark.rs` the app mark (Node hexagon + red X on a dark tile),
+  `icon.rs` the Win32 handle over it.
 - `PRIVACY.md` and `TERMS.md` -- added 2026-09-16 at the user's request. The
   privacy statement is factual (no network code, two registry values, one local
   log); the terms defer to MIT rather than manufacturing a contract, and say so.
-- `ternitor.log` -- real hide/re-show history from this machine, still written by
-  the Rust build.
+- `ternitor.log` -- real hide/re-show/focus-taken-back history from this machine,
+  still written by the Rust build.
 - Measurements on this machine. PowerShell version: 160 MB working set, 72 MB
   private bytes, 986 ms start, 0 ms idle CPU over 5 s. Rust build: 17.4 MB working
   set, 2.8 MB private, ~10 ms start, 0.06 s CPU, and 0% idle CPU -- the surface
@@ -120,5 +125,5 @@ consoles, so nothing is hiding its own at boot.
    the app does in a way the user cannot get another way.
 3. Never touch a terminal a human opened.
 4. Zero ceremony: one file, no runtime, no first-run flow. Installing is optional
-   — the exe runs where it stands, and `install.ps1` adds only the shell
-   integration that Settings > Apps and autostart need.
+   — the exe runs where it stands, and `Ternitor-Setup.exe` (or `install.ps1`)
+   adds only the shell integration that Settings > Apps and autostart need.

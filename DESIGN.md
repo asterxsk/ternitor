@@ -109,7 +109,8 @@ instrument rather than a decoration.
 
 The figure is the app: **the counter measures work that leaves no trace**. It is
 the only thing on the surface that carries a number, and the number is the whole
-of what Ternitor produces — windows opened and taken away before they were drawn.
+of what Ternitor produces — windows opened and taken away, most of them before
+they were ever drawn, and the focus handed back when one of them takes it anyway.
 There is no history beside it because the app keeps none.
 
 Five rules hold the surface together:

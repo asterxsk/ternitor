@@ -6,11 +6,11 @@ description = "Hides the blank console windows Windows opens on behalf of consol
 authors = ["asterxsk"]
 
 [build-dependencies]
-# The exe's icon resource. Build time only, and only on Windows: nothing it
-# produces is linked into the running app.
+# The exe's icon resource. Build time only: nothing it produces is linked into
+# the running app.
 winresource = "0.1"
 
-[target.'cfg(windows)'.dependencies]
+[dependencies]
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",

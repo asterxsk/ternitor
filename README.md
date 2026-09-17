@@ -17,8 +17,9 @@ One file, no runtime, no telemetry — and nothing visible once it is running.
 
 Your agent goes to run something, and a blank terminal window appears on the desktop, takes focus
 mid-sentence, and sits there doing nothing. Dismiss it and the next tool call opens another one.
-Ternitor watches for those windows and hides them before they are ever drawn — every agent, every
-tool, silently, from the notification area.
+Ternitor watches for those windows and hides them before they are ever drawn — and when one of them
+manages to take focus anyway, it hands focus back to the window you were on. Every agent, every tool,
+silently, from the notification area.
 
 ## Why the windows appear
 
@@ -36,14 +37,22 @@ because `C:\Program Files\nodejs` is on Machine `PATH` and User `PATH` is append
 ## Quickstart
 
 ```
+Ternitor-Setup.exe
+```
+
+Run it. It installs for the current user — no administrator rights — copies `Ternitor.exe` to
+`%LOCALAPPDATA%\Programs\Ternitor`, adds a Start Menu shortcut, and registers an entry in
+**Settings > Apps** so it can be removed like anything else. Starting with Windows is a tick box on
+the last page, and the switch in Settings afterwards.
+
+Or, from a checkout, the same install without the installer:
+
+```
 .\install.ps1
 ```
 
-Installs for the current user — no administrator rights, no installer runtime. It copies
-`ternitor.exe` to `%LOCALAPPDATA%\Programs\Ternitor`, adds a Start Menu shortcut, points the per-user
-`Run` key at it, and registers an entry in **Settings > Apps** so it can be removed like anything
-else. `install.ps1 -NoStartWithWindows -NoLaunch` if you want it installed but neither starting at
-sign-in nor running yet.
+`install.ps1 -NoStartWithWindows -NoLaunch` if you want it installed but neither starting at sign-in
+nor running yet.
 
 Or skip all of that and run the exe where it stands. There is nothing to unpack:
 
@@ -58,14 +67,16 @@ the way.
 
 To have it start at logon, open Settings and flip **Start with Windows**. That writes one value under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Delete the exe and that value and nothing is
-left behind. **Uninstall** in Settings > Apps runs `uninstall.ps1`, which stops the app and takes
-away the exe, the folder, the shortcut, the `Run` value and that entry.
+left behind. **Uninstall** in Settings > Apps stops the app and takes away the exe, the folder, the
+shortcut, the `Run` value and that entry — through the installer's own uninstaller, or through
+`uninstall.ps1` if it was installed with the script.
 
 ## What you get
 
 | | |
 |---|---|
-| **Hides the window** | Before it paints, not after — no flash, no focus steal, no flicker in the taskbar |
+| **Hides the window** | Before it paints, not after — no flash, no flicker in the taskbar |
+| **Takes the focus back** | A hidden console can still activate itself; Windows Terminal wakes its handoff window again as the client attaches, seconds later, without showing anything. It is hidden again and the foreground goes back to the window that last really had it |
 | **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked and re-shown, without activation, once its title reveals it was a real shell |
 | **Counts its work** | The settings screen carries a live count of what it has hidden this session, and the title of the last one |
 | **Refuses to grow** | Four things on the settings screen and nothing else — a switch, the counter, app info, and a way out. Everything that is not one of those lives on the tray menu |
@@ -84,13 +95,22 @@ agent spawns a child ─▶ new console, no window yet ─▶ default-terminal b
                                 │
                                 ▼
                      hidden before it is drawn
+                                │
+        takes the foreground while hidden ─▶ hidden again,
+                                             focus handed back
 ```
 
-A `SetWinEventHook` on `EVENT_OBJECT_CREATE` and `EVENT_OBJECT_SHOW` watches for new windows. A
-window is hidden only if its **class** is `CASCADIA_HOSTING_WINDOW_CLASS` **and** the command line of
-the process that owns it contains `-Embedding` — a flag set by the default-terminal broker and
-nothing else, read with `NtQueryInformationProcess`. Matching the window *title* does not work: at
-creation time it is still the broker's placeholder, and only later becomes the client's path.
+A `SetWinEventHook` on `EVENT_OBJECT_CREATE` and `EVENT_OBJECT_SHOW` watches for new windows, and one
+on `EVENT_SYSTEM_FOREGROUND` watches who has focus. A window is hidden only if its **class** is
+`CASCADIA_HOSTING_WINDOW_CLASS` **and** the command line of the process that owns it contains
+`-Embedding` — a flag set by the default-terminal broker and nothing else, read with
+`NtQueryInformationProcess`. Matching the window *title* does not work: at creation time it is still
+the broker's placeholder, and only later becomes the client's path.
+
+The foreground hook is the second half. A window that has already been hidden can be activated anyway,
+which moves focus whether or not anything is on screen and leaves you typing into a window you cannot
+see. Anything that does it is hidden again, and the window that last really had the foreground gets it
+back.
 
 Event-driven, no polling, and a terminal you opened yourself is never touched.
 
@@ -112,6 +132,9 @@ the count is the whole of what Ternitor produces.
 
 - **Windows 11, x64.** No runtime, no redistributable, no Node. PowerShell only for the installer,
   which you can skip.
+- **Windows only.** The windows it hides are made by Windows, and `janitor.rs` has nothing to port:
+  the detection is Windows' own window classes and the broker's `-Embedding` flag. Nothing here builds
+  for Linux or macOS.
 - **567 KB.** One exe, most of it the icon. Nothing is written outside its own folder and the
   registry values you can see and delete.
 - **Nothing at startup.** The build is a GUI-subsystem binary (PE subsystem 2), so it can never
@@ -120,31 +143,11 @@ the count is the whole of what Ternitor produces.
   gets it for free.
 - **No GPU, no service, no scheduled task, no driver.**
 
-## Other platforms
-
-It builds and runs anywhere, and on Linux and macOS it does nothing, on purpose:
-
-```
-$ ternitor --why
-Ternitor does nothing on macos: there is nothing here to hide.
-...
-```
-
-The windows it hides are made by Windows itself — a ConPTY client with no console spawns a child, the
-child gets a brand-new console, and the default-terminal broker hands that console to Windows Terminal
-as a visible window. Linux and macOS have no such mechanism, and `janitor.rs` has nothing to port: the
-detection is Windows' own window classes and the broker's `-Embedding` flag. A resident process
-pretending otherwise would be a lie with a tray icon attached, so there isn't one, nothing is written
-to disk, and no autostart entry is created.
-
-The build is `cargo build --release` on any target; the non-Windows `main` is a few lines in
-`src/main.rs` and the Win32 modules are behind `cfg(windows)`.
-
 ## Privacy
 
 Nothing leaves the machine. There is no network code in the binary at all — no telemetry, no
 analytics, no update check. The one file it writes is `ternitor.log` beside the exe: every hide, every
-re-show, every toggle. Read it, or delete it while the app is running.
+re-show, every focus taken back, every toggle. Read it, or delete it while the app is running.
 
 The full accounting of what it reads and writes is in [PRIVACY.md](PRIVACY.md).
 
@@ -159,13 +162,26 @@ Rust 2021, one dependency (the `windows` crate). The binary lands at `target\rel
 The `ternitor.exe` committed here is that build copied up, so it goes stale whenever `src/` moves.
 Rebuild before trusting it.
 
+The installer needs Inno Setup 6 (`winget install JRSoftware.InnoSetup`). It ships the exe from the
+repo root, not one out of `target\release`, and takes the version and the icon off that exe so neither
+can drift from what it ships:
+
+```
+copy target\release\ternitor.exe .\ternitor.exe
+.\installer\build.ps1
+```
+
+That writes `Ternitor-Setup.exe` beside it.
+
 ## Files
 
 | File | |
 |---|---|
 | `ternitor.exe` | the app; run it directly |
+| `Ternitor-Setup.exe` | the installer: the same per-user install in one double-clickable file |
 | `ternitor.log` | created next to the exe on first run |
 | `install.ps1` / `uninstall.ps1` | per-user install and removal, no administrator rights |
+| `installer/` | the Inno Setup script behind `Ternitor-Setup.exe`, and the script that builds it |
 | `src/` | `janitor.rs` detection, `ui.rs` the settings surface, `tray.rs` the icon |
 | `src/mark.rs` | the app mark: the one definition of the icon, which `build.rs` bakes into the exe |
 | `assets/readme/` | the animated header on this page, as SVG |

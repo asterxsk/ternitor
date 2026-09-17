@@ -18,6 +18,9 @@ To do its job, Ternitor has to look at what is happening on your own desktop:
   default-terminal broker's `-Embedding` flag.
 - **Window titles**, after the fact, to re-check a window it hid -- a title that
   turns out to be a real shell gets the window back.
+- **Which window has the foreground**, so it can be given back: a hidden window
+  that activates itself is hidden again, and the foreground returns to the window
+  that last really had it.
 
 All of that is examined in memory, on your machine. None of it is transmitted.
 The only thing that can ever be written down is the log below, and that file
@@ -27,20 +30,22 @@ stays on your disk.
 
 | Where | What | When |
 |---|---|---|
-| `ternitor.log`, beside the exe | One line per event: a window hidden, a window given back, a setting changed. Hidden-window titles appear here. | While the app runs |
+| `ternitor.log`, beside the exe | One line per event: a window hidden, a window given back, a focus taken back, a setting changed. Hidden-window titles appear here. | While the app runs |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` -> `Ternitor` | The path to the exe, so it starts at sign-in | Only while **Start with Windows** is on |
-| `HKCU\...\Uninstall\Ternitor` | Name, version and uninstall command, so Windows can list it in Settings > Apps | Written by `install.ps1` |
-| `...\Start Menu\Programs\Ternitor.lnk` | A shortcut | Written by `install.ps1` |
+| `HKCU\...\Uninstall\` | Name, version and uninstall command, so Windows can list it in Settings > Apps | Written by the installer, or by `install.ps1`, which uses the key `...\Uninstall\Ternitor` |
+| `...\Start Menu\Programs\Ternitor.lnk` | A shortcut | Written by the installer or by `install.ps1` |
+| `%LOCALAPPDATA%\Programs\Ternitor\` | `Ternitor.exe`, and the uninstaller that removes it | Written by the installer, or by `install.ps1` |
 
 Nothing is written anywhere else: not in `Documents`, not in `ProgramData`, not
 in the registry outside those two keys. There is no cache and no database.
 
 ## Removing it
 
-`uninstall.ps1` stops the app and deletes the exe, the folder, the shortcut, the
-Run entry and the Settings > Apps entry, and asks whether to delete the log. The
-same is true by hand: delete the exe, the `Ternitor` Run value, and the folder --
-there is nothing else to clean up.
+**Uninstall** in Settings > Apps stops the app and deletes the exe, the folder,
+the shortcut, the Run entry and the Settings > Apps entry. `uninstall.ps1` asks
+whether to keep the log on the way out; `Ternitor-Setup.exe`'s own uninstaller
+takes it with everything else. The same is true by hand: delete the exe, the
+`Ternitor` Run value, and the folder -- there is nothing else to clean up.
 
 ## Data requests
 

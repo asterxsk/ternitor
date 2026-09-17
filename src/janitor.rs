@@ -284,7 +284,14 @@ unsafe extern "system" fn wnd_proc(
 }
 
 /// Keeps track of what was in front, so a hide can put focus back rather than
-/// leaving the user on the desktop.
+/// leaving the user on the desktop -- and takes focus back when a window we hid
+/// takes it instead.
+///
+/// A hidden console can still be activated. The broker wakes the client's window
+/// again as the console attaches, seconds after the hide, and an activation moves
+/// focus whether or not anything is on screen. The object events do not cover
+/// that: Windows Terminal re-activates without re-showing, so nothing else here
+/// would notice, and the user is left typing into a window they cannot see.
 unsafe extern "system" fn on_foreground(
     _hook: HWINEVENTHOOK,
     _event: u32,
@@ -294,13 +301,26 @@ unsafe extern "system" fn on_foreground(
     _thread: u32,
     _time: u32,
 ) {
-    if hwnd.is_invalid() || is_unwanted(hwnd) {
+    if hwnd.is_invalid() {
         return;
     }
+
+    // Borrowed across the Win32 calls, as in `on_object_event`: nothing reached
+    // from here touches the state again.
     STATE.with(|cell| {
-        if let Some(st) = cell.borrow_mut().as_mut() {
-            st.last_foreground = hwnd;
+        let mut guard = cell.borrow_mut();
+        let Some(st) = guard.as_mut() else { return };
+
+        if !st.paused && !st.released.contains(&key(hwnd)) && is_unwanted(hwnd) {
+            unsafe {
+                let _ = ShowWindow(hwnd, SW_HIDE);
+            }
+            restore_focus(st.last_foreground, hwnd);
+            log::write(&format!("focus taken back title=[{}]", title_of(hwnd)));
+            return;
         }
+
+        st.last_foreground = hwnd;
     });
 }
 
