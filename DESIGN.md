@@ -115,8 +115,9 @@ There is no history beside it because the app keeps none.
 
 Five rules hold the surface together:
 
-1. **Instruments, not controls.** Only three things answer the pointer: the
-   switch, the quit button, and the window itself. Everything else is a reading.
+1. **Instruments, not controls.** Only four things answer the pointer: the
+   switch, the update plate, the quit button, and the window itself. Everything
+   else is a reading.
 2. **State is a mark, not a colour.** ON is a filled track with the knob knocked
    out of it; OFF is an outlined track with an outlined knob. The whole surface
    reads correctly in greyscale.
@@ -191,7 +192,7 @@ Bands, top to bottom:
 |---|---|---|
 | Head | 20–128 | Name and description left; counter right |
 | Fields | 144–241 | Last cut, session clock left; the switch and its small print right |
-| Footer | 284–314 | Version, target, log location |
+| Footer | 284–314 | Version and target left; the update plate and quit right |
 
 The two columns are 44–474 and 452–676, and they overlap because the paragraph
 and the counter never share a line. The paragraph's three lines are held to a
@@ -275,9 +276,19 @@ could tell. While paused, the counter's label reads `PAUSED` in `body` followed
 by `NOT COUNTING` in `dim`, in place of `HIDDEN THIS SESSION`. It is an indicator,
 not a control: there is still nothing to click.
 
-**The footer.** Version and target left; log location and the quit button right.
-The log hint is static, `mono`, `dim`, and stops short of the button rather than
-running under it — a control behind text is not a control.
+**The update plate.** 176×28, the same 4px plate as the quit button and drawn at
+the same weight, standing to its left in the footer. Its label is its state —
+`CHECK FOR UPDATES`, `CHECKING`, `UP TO DATE`, the version that is available, or
+the refusal — so an answer needs no second element to show itself, the way a
+refused switch states its reason in the small print already there. Resting it is
+a `body` outline with `body` text, hovered it goes to `ink`, and while a check is
+in the air the text drops to `dim` and the plate stops answering. Pressed with an
+available version in hand, it opens the page that version is on.
+
+**The footer.** Version and target left; the update plate and the quit button
+right. The log hint that sat between them is gone: the tray menu already has
+*Open log*, and a footer is not the place to spend a control's width saying the
+same thing twice.
 
 ## Do's and Don'ts
 

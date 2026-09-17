@@ -343,7 +343,33 @@ unsafe extern "system" fn on_object_event(
         let mut guard = cell.borrow_mut();
         let st = guard.as_mut()?;
 
-        if st.paused || st.released.contains(&key(hwnd)) || !is_unwanted(hwnd) {
+        let class = class_of(hwnd);
+        let title = title_of(hwnd);
+        let unwanted = is_unwanted(hwnd);
+
+        // Every window the gate looks at is written down, hidden or not, so the
+        // log can be read back to see what got through and why. The two console
+        // classes always count. Any other class counts only when its owner is a
+        // broker host -- the one clue that a console host whose class name we do
+        // not know has arrived -- and only as it is shown, so the probe does not
+        // run for every helper window Windows creates.
+        let known = class == CASCADIA_CLASS || class == CONSOLE_CLASS;
+        if known
+            || (_event == EVENT_OBJECT_SHOW && !title.trim().is_empty() && is_console_host(hwnd))
+        {
+            log::write(&format!(
+                "gate {class} title=[{title}] -> {}",
+                if known && unwanted {
+                    "ours, hidden"
+                } else if known {
+                    "ours, left alone"
+                } else {
+                    "not a class we know, owner is a broker host"
+                }
+            ));
+        }
+
+        if st.paused || st.released.contains(&key(hwnd)) || !unwanted {
             return None;
         }
 
@@ -450,6 +476,16 @@ fn is_unwanted(hwnd: HWND) -> bool {
     }
 
     false
+}
+
+/// Whether the process owning this window is a default-terminal broker host:
+/// the one process whose command line carries `-Embedding`.
+fn is_console_host(hwnd: HWND) -> bool {
+    let mut pid = 0u32;
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    }
+    command_line_of(pid).is_some_and(|cmd| command_line_has_embedding(&cmd))
 }
 
 /// What a pending window's title says it is.

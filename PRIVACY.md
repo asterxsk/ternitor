@@ -1,12 +1,16 @@
 # Privacy
 
-Ternitor collects nothing, sends nothing, and has no network code in it at all.
-There is no telemetry, no analytics, no update check, no crash reporting, no
-account, and no third party of any kind. Nothing about you or your machine
-leaves your machine, because there is nowhere in this program for it to go.
+Ternitor collects nothing, sends nothing on its own, and has no accounts, no
+telemetry, no analytics, no crash reporting and no usage reporting of any kind.
+Nothing about you or your machine leaves your machine by itself.
 
-That is not a policy promise, it is the shape of the program: `ternitor.exe` is
-one binary with no HTTP client and no URLs in it.
+There is exactly one request in the program, and it happens only when you press
+**Check for updates**: a `GET` of
+`https://raw.githubusercontent.com/asterxsk/ternitor/main/Cargo.toml`, to read the
+version number in the repo. Nothing about the machine goes with it beyond the
+app's own version in the HTTP user agent -- no identifier, no cookie, no query
+string. No other screen, no tray action and no startup path can open a socket,
+and nothing is ever checked on a schedule.
 
 ## What it reads
 
@@ -31,7 +35,7 @@ stays on your disk.
 
 | Where | What | When |
 |---|---|---|
-| `ternitor.log`, beside the exe | One line per event: a window hidden, a window given back, a focus taken back, a setting changed. Hidden-window titles appear here. | While the app runs |
+| `ternitor.log`, beside the exe | One line per event: a window hidden, a window given back, a focus taken back, every window the gate looked at (`gate ...`, hidden or left alone), a check for updates and what it found, a setting changed. Window titles and the pid that owned them appear here. | While the app runs |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` -> `Ternitor` | The path to the exe, so it starts at sign-in | Only while **Start with Windows** is on |
 | `HKCU\...\Uninstall\` | Name, version and uninstall command, so Windows can list it in Settings > Apps | Written by the installer, or by `install.ps1`, which uses the key `...\Uninstall\Ternitor` |
 | `...\Start Menu\Programs\Ternitor.lnk` | A shortcut | Written by the installer or by `install.ps1` |

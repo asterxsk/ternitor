@@ -10,8 +10,9 @@ wins.
 
 - **It modifies your system, by design.** It writes one value under
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` when you turn on
-  *Start with Windows*, and it changes the visibility of windows on your desktop.
-  Full list in [PRIVACY.md](PRIVACY.md).
+  *Start with Windows*, it changes the visibility of windows on your desktop, and
+  pressing *Check for updates* asks github for one public file. Full list in
+  [PRIVACY.md](PRIVACY.md).
 - **Hiding a window is best effort.** Ternitor hides console windows it decides
   were spawned by a console-less process, and it can be wrong in both
   directions: it may miss a window, or hide one you wanted. It re-checks every

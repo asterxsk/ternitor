@@ -15,6 +15,7 @@ mod mark;
 mod theme;
 mod tray;
 mod ui;
+mod update;
 mod win;
 
 fn main() {

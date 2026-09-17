@@ -21,12 +21,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::win::{already_exists, instance, pcw, wide};
-use crate::{autostart, janitor, log, tray, ui};
+use crate::{autostart, janitor, log, tray, ui, update};
 
 /// Tray icon notifications arrive on the app's hidden window under this message
 /// number, with the mouse event in `lparam` -- classic semantics, see
 /// `tray::Tray::add`.
 pub const MSG_TRAY: u32 = WM_APP + 1;
+
+/// Posted by the update thread when its answer has landed, so the surface can
+/// show it without the message loop ever waiting on a socket.
+pub const MSG_UPDATE: u32 = WM_APP + 2;
 
 /// Everything the settings screen renders, read in one go so the UI never holds
 /// a borrow of live state while it draws.
@@ -36,11 +40,14 @@ pub struct Snapshot {
     pub autostart: bool,
     pub last_title: String,
     pub session_start: Instant,
+    pub update: update::State,
 }
 
 pub struct App {
     janitor: Option<janitor::Janitor>,
     tray: Option<tray::Tray>,
+    /// The message-only window the update thread posts to when it is done.
+    hwnd: HWND,
     session_start: Instant,
     /// The title of the last window hidden. The app tracks it from the events it
     /// receives rather than reaching into the janitor for it.
@@ -52,6 +59,7 @@ impl App {
         App {
             janitor: None,
             tray: None,
+            hwnd: HWND::default(),
             session_start: Instant::now(),
             last_title: String::new(),
         }
@@ -68,7 +76,14 @@ impl App {
             autostart: autostart::is_enabled(),
             last_title: self.last_title.clone(),
             session_start: self.session_start,
+            update: update::state(),
         }
+    }
+
+    /// Ask github what the newest build is. Off the main thread, because the loop
+    /// behind this call is the one that hides windows.
+    pub fn check_for_updates(&self) {
+        update::start(self.hwnd.0 as isize);
     }
 
     /// The janitor owns the detection and its own log lines. All the app does
@@ -162,6 +177,10 @@ pub fn open_log() {
     with(|a| a.open_log())
 }
 
+pub fn check_for_updates() {
+    with(|a| a.check_for_updates())
+}
+
 /// The tray notification handler: the shell posts `MSG_TRAY` to our hidden
 /// window with the mouse event in `lparam`.
 fn on_tray_message(lparam: LPARAM) {
@@ -191,6 +210,10 @@ unsafe extern "system" fn message_proc(
     match msg {
         MSG_TRAY => {
             on_tray_message(lparam);
+            LRESULT(0)
+        }
+        MSG_UPDATE => {
+            ui::refresh();
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -282,6 +305,7 @@ pub fn run() -> i32 {
     with(|a| {
         a.janitor = janitor;
         a.tray = tray;
+        a.hwnd = hwnd;
     });
     with(|a| a.refresh_tooltip());
 

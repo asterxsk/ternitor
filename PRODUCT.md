@@ -75,13 +75,15 @@ consoles, so nothing is hiding its own at boot.
 
 - Single instance, enforced by a named mutex.
 - Tray icon with a small menu; one settings window, opened from the tray.
-- The settings window carries exactly four things: a "Start with Windows" toggle,
-  a live count of windows hidden this session, app info describing what the app
-  does, and Quit, which ends the process outright -- the same thing the tray menu
-  offers, for when the tray icon is buried. Behaviour beyond that is not
-  configurable (confirmed: no pause toggle, no restore-shells toggle, no log
-  toggle on the screen). Quit added 2026-09-16, the only control added since the
-  Rust build.
+- The settings window carries exactly five things: a "Start with Windows" toggle,
+  a live count of windows hidden this session, a "Check for updates" button that
+  reads the version out of the repo's `Cargo.toml` on github when it is pressed,
+  app info describing what the app does, and Quit, which ends the process
+  outright -- the same thing the tray menu offers, for when the tray icon is
+  buried. Behaviour beyond that is not configurable (confirmed: no pause toggle,
+  no restore-shells toggle, no log toggle on the screen). Quit added 2026-09-16;
+  the update check added 2026-09-17, and it is the only network code in the app
+  and the only thing in it that is ever pressed to ask.
 - Event-driven (`SetWinEventHook`), never polling.
 - No runtime dependency, config in the registry, log next to the exe. Still
   portable -- copy the folder anywhere -- and now also installable:
@@ -108,8 +110,13 @@ consoles, so nothing is hiding its own at boot.
   settings surface, `mark.rs` the app mark (Node hexagon + red X on a dark tile),
   `icon.rs` the Win32 handle over it.
 - `PRIVACY.md` and `TERMS.md` -- added 2026-09-16 at the user's request. The
-  privacy statement is factual (no network code, two registry values, one local
-  log); the terms defer to MIT rather than manufacturing a contract, and say so.
+  privacy statement is factual (one pressed update check, two registry values,
+  one local log); the terms defer to MIT rather than manufacturing a contract,
+  and say so.
+- `ternitor.log` -- also the gate's own audit: every window it looked at, whether
+  it hid it or left it alone, and why. Added 2026-09-17 so the gate can be
+  reviewed against what actually crosses the desktop instead of being tuned from
+  memory.
 - `ternitor.log` -- real hide/re-show/focus-taken-back history from this machine,
   still written by the Rust build.
 - Measurements on this machine. PowerShell version: 160 MB working set, 72 MB

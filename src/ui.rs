@@ -54,6 +54,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::app::{self, Snapshot};
 use crate::theme::{self, Fonts, Palette, Rgb};
+use crate::update;
 use crate::win::{instance, pcw, wide};
 
 /// `Win32::UI::Controls::WM_MOUSELEAVE`, declared here so the crate does not have
@@ -87,6 +88,13 @@ const QUIT_W: i32 = 88;
 const QUIT_H: i32 = 28;
 const QUIT_TOP: i32 = 288;
 
+/// The update control, to its left, in the space the log hint used to take. The
+/// log is reachable from the tray menu; this is the only control that asks the
+/// network anything, and the widest its label ever gets is `CHECK FOR UPDATES`.
+const UPDATE_W: i32 = 176;
+const UPDATE_H: i32 = 28;
+const UPDATE_TOP: i32 = 288;
+
 /// The quit button sits under the footer rule and inside the sheet. Both are
 /// constants, so this is settled at compile time rather than at run time.
 const _: () = {
@@ -103,6 +111,7 @@ const _: () = {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Control {
     Autostart,
+    Update,
     Quit,
 }
 
@@ -506,6 +515,18 @@ fn quit_rect(s: f32) -> RECT {
     }
 }
 
+fn update_rect(s: f32) -> RECT {
+    let quit = quit_rect(s);
+    let gap = theme::px(24.0, s);
+    let width = theme::px(UPDATE_W as f32, s);
+    RECT {
+        left: quit.left - gap - width,
+        top: theme::px(UPDATE_TOP as f32, s),
+        right: quit.left - gap,
+        bottom: theme::px((UPDATE_TOP + UPDATE_H) as f32, s),
+    }
+}
+
 /// The ring the keyboard leaves on whatever it is pointing at, drawn just
 /// outside the control so it never covers the control's own outline.
 fn focus_ring(p: &Painter, r: RECT, pal: &Palette) {
@@ -649,6 +670,67 @@ fn draw_quit(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui) {
     );
 }
 
+/// The update control, to the left of the quit plate.
+///
+/// Its label is its state -- `CHECK FOR UPDATES`, then `CHECKING`, then the
+/// answer -- for the same reason the switch's small print explains a refusal in
+/// place: an answer that needs a second element to show itself would be the fifth
+/// thing on a surface that is trying to stay this small.
+fn draw_update(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui, snap: &Snapshot) {
+    let r = update_rect(p.s);
+    let checking = matches!(snap.update, update::State::Checking);
+    let hot = ui.hover == Some(Control::Update) && !checking;
+    let down = ui.pressed == Some(Control::Update);
+
+    if down {
+        p.round(r, p.d(4.0), pal.ink, Some(pal.ink));
+    } else {
+        p.round(r, p.d(4.0), if hot { pal.ink } else { pal.body }, None);
+    }
+    if ui.focus == Some(Control::Update) {
+        focus_ring(p, r, pal);
+    }
+
+    let ink = if down {
+        pal.ground
+    } else if hot {
+        pal.ink
+    } else if checking {
+        pal.dim
+    } else {
+        pal.body
+    };
+
+    // Centred by hand, as the quit plate is: `DrawTextW` has nowhere to put the
+    // edge printing's tracking. Fitted, so a long version number ellipsizes
+    // rather than growing into the quit plate.
+    let label = p.fit(
+        &update_label(&snap.update),
+        r.right - r.left - p.d(20.0),
+        fonts.label,
+        theme::LABEL_TRACKING,
+    );
+    let w = p.measure(&label, fonts.label, theme::LABEL_TRACKING);
+    p.text(
+        &label,
+        (r.left + r.right - w) / 2,
+        (r.top + r.bottom) / 2 - p.d(7.0),
+        fonts.label,
+        ink,
+        theme::LABEL_TRACKING,
+    );
+}
+
+fn update_label(state: &update::State) -> String {
+    match state {
+        update::State::Idle => "CHECK FOR UPDATES".into(),
+        update::State::Checking => "CHECKING".into(),
+        update::State::Done(update::Outcome::UpToDate) => "UP TO DATE".into(),
+        update::State::Done(update::Outcome::Newer(version)) => format!("{version} AVAILABLE"),
+        update::State::Done(update::Outcome::Unreachable) => "COULDN'T CHECK".into(),
+    }
+}
+
 fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &Ui) {
     let left = p.d(PAD as f32);
 
@@ -746,16 +828,8 @@ fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &U
     );
     p.text(&info, left, p.d(302.0), fonts.mono, pal.dim, 0.0);
 
+    draw_update(p, pal, fonts, ui, snap);
     draw_quit(p, pal, fonts, ui);
-    // The log hint stops short of the button rather than running under it.
-    p.text_right(
-        "log: ternitor.log",
-        quit_rect(p.s).left - p.d(24.0),
-        p.d(302.0),
-        fonts.mono,
-        pal.dim,
-        0.0,
-    );
 }
 
 fn span(d: Duration) -> String {
@@ -851,6 +925,8 @@ fn hit(x: i32, y: i32) -> Option<Control> {
 
     if near(quit_rect(s)) {
         Some(Control::Quit)
+    } else if near(update_rect(s)) {
+        Some(Control::Update)
     } else if near(toggle_rect(s)) {
         Some(Control::Autostart)
     } else {
@@ -866,10 +942,25 @@ fn activate(control: Control) -> bool {
             toggle();
             true
         }
+        Control::Update => {
+            press_update();
+            true
+        }
         Control::Quit => {
             app::quit();
             false
         }
+    }
+}
+
+/// One control, two jobs, and the label says which: with an answer in hand that
+/// says a newer build exists it opens the page that build is on, and otherwise it
+/// goes and asks.
+fn press_update() {
+    match app::snapshot().update {
+        update::State::Checking => {}
+        update::State::Done(update::Outcome::Newer(_)) => update::open_downloads(),
+        _ => app::check_for_updates(),
     }
 }
 
@@ -993,7 +1084,8 @@ unsafe extern "system" fn sheet_proc(
                 k if k == VK_TAB.0 => {
                     with_ui(|ui| {
                         ui.focus = Some(match ui.focus {
-                            Some(Control::Autostart) => Control::Quit,
+                            Some(Control::Autostart) => Control::Update,
+                            Some(Control::Update) => Control::Quit,
                             _ => Control::Autostart,
                         })
                     });
@@ -1289,6 +1381,7 @@ mod tests {
                 autostart,
                 last_title: r"C:\Program Files\nodejs\node.exe".to_string(),
                 session_start: Instant::now(),
+                update: update::State::Idle,
             };
             draw_sheet(&p, pal, &snap, &fonts, &ui);
             write_bmp(&dir.join(format!("sheet-{name}.bmp")), px, w, h);

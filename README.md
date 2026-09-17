@@ -79,8 +79,8 @@ shortcut, the `Run` value and that entry — through the installer's own uninsta
 | **Takes the focus back** | A hidden console can still activate itself; Windows Terminal wakes its handoff window again as the client attaches, seconds later, without showing anything. It is hidden again and the foreground goes back to the window that last really had it |
 | **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked 600ms in and given back, without activation, only when its title is a shell's own — a directory it is sitting in, a prompt, an elevated console, or a shell by name. `npm` naming itself is not one |
 | **Counts its work** | The settings screen carries a live count of what it has hidden this session, and the title of the last one |
-| **Refuses to grow** | Four things on the settings screen and nothing else — a switch, the counter, app info, and a way out. Everything that is not one of those lives on the tray menu |
-| **Says nothing** | No network calls, no telemetry, no update check, no crash reporting |
+| **Refuses to grow** | Five things on the settings screen and nothing else — a switch, the counter, an update check, app info, and a way out. Everything that is not one of those lives on the tray menu |
+| **Asks once, when asked** | One request exists in the whole binary, behind **Check for updates**. No telemetry, no analytics, no crash reporting, and nothing checked on a schedule |
 
 ## How it works
 
@@ -117,9 +117,9 @@ Event-driven, no polling, and a terminal you opened yourself is never touched.
 ## Settings
 
 The settings window is the app's only surface, opened from the tray and perhaps once a session. It
-carries four things and refuses to carry a fifth: **Start with Windows**, a live count of the windows
-hidden this session, app info, and **Quit**, which ends the process completely — the same thing the
-tray menu's *Exit* does, for when the icon is hard to find.
+carries five things and refuses to carry a sixth: **Start with Windows**, a live count of the windows
+hidden this session, **Check for updates**, app info, and **Quit**, which ends the process completely
+— the same thing the tray menu's *Exit* does, for when the icon is hard to find.
 
 Everything else stays on the tray menu, because a utility whose value is *not being noticed* should
 not grow a control panel.
@@ -145,9 +145,15 @@ the count is the whole of what Ternitor produces.
 
 ## Privacy
 
-Nothing leaves the machine. There is no network code in the binary at all — no telemetry, no
-analytics, no update check. The one file it writes is `ternitor.log` beside the exe: every hide, every
-re-show, every focus taken back, every toggle. Read it, or delete it while the app is running.
+Nothing leaves the machine on its own. There is no telemetry, no analytics, no crash reporting, and no
+update check on a timer: the only request in the binary is the one behind **Check for updates**, which
+reads the version out of the repo's `Cargo.toml` on github. It sends nothing but the app's own version,
+it happens when the button is pressed and at no other time, and a Ternitor nobody asks never opens a
+socket.
+
+The one file it writes is `ternitor.log` beside the exe: every hide, every re-show, every focus taken
+back, every check, every toggle, and a line for every window the gate looked at and left alone. Read
+it, or delete it while the app is running.
 
 The full accounting of what it reads and writes is in [PRIVACY.md](PRIVACY.md).
 
