@@ -38,12 +38,14 @@ use windows::Win32::System::Threading::{
     AttachThreadInput, GetCurrentThreadId, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows::Win32::Graphics::Dwm::{DWMWA_CLOAK, DwmSetWindowAttribute};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, GetClassNameW, GetForegroundWindow, GetWindowTextW,
-    GetWindowThreadProcessId, IsWindow, RegisterClassW, SetForegroundWindow, SetTimer, ShowWindow,
-    EVENT_OBJECT_CREATE, EVENT_OBJECT_SHOW, EVENT_SYSTEM_FOREGROUND, HWND_MESSAGE, OBJID_WINDOW,
-    SW_HIDE, SW_SHOWNOACTIVATE, WINEVENT_OUTOFCONTEXT, WM_TIMER, WNDCLASSW, WS_EX_TOOLWINDOW,
-    WS_POPUP,
+    CreateWindowExW, DefWindowProcW, GWL_EXSTYLE, GetClassNameW, GetForegroundWindow,
+    GetWindowLongPtrW, GetWindowTextW, GetWindowThreadProcessId, IsWindow, RegisterClassW,
+    SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow, EVENT_OBJECT_CREATE,
+    EVENT_OBJECT_SHOW, EVENT_SYSTEM_FOREGROUND, HWND_MESSAGE, OBJID_WINDOW, SW_HIDE,
+    SW_SHOWNOACTIVATE, WINEVENT_OUTOFCONTEXT, WM_TIMER, WNDCLASSW, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_POPUP,
 };
 
 use crate::log;
@@ -312,9 +314,7 @@ unsafe extern "system" fn on_foreground(
         let Some(st) = guard.as_mut() else { return };
 
         if !st.paused && !st.released.contains(&key(hwnd)) && is_unwanted(hwnd) {
-            unsafe {
-                let _ = ShowWindow(hwnd, SW_HIDE);
-            }
+            suppress(hwnd);
             restore_focus(st.last_foreground, hwnd);
             log::write(&format!("focus taken back title=[{}]", title_of(hwnd)));
             return;
@@ -373,9 +373,7 @@ unsafe extern "system" fn on_object_event(
             return None;
         }
 
-        unsafe {
-            let _ = ShowWindow(hwnd, SW_HIDE);
-        }
+        suppress(hwnd);
         restore_focus(st.last_foreground, hwnd);
         st.hidden += 1;
 
@@ -440,6 +438,7 @@ fn process_pending() {
                         st.released.clear();
                     }
                     st.released.insert(key(hwnd));
+                    unsuppress(hwnd);
                     unsafe {
                         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                     }
@@ -486,6 +485,53 @@ fn is_console_host(hwnd: HWND) -> bool {
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
     }
     command_line_of(pid).is_some_and(|cmd| command_line_has_embedding(&cmd))
+}
+
+/// Take a console window out of circulation before anything can paint it: no
+/// activation, no compositing by the DWM, and hidden besides.
+///
+/// Hiding alone cannot win this race. The window is created hidden and shown
+/// later by the terminal that owns it, and the event that reports the show
+/// arrives after the fact -- measured on this machine, ten milliseconds on
+/// screen, a foreground taken, and a taskbar raised over a full-screen app.
+/// A cloaked window is never drawn at all, and one that cannot be activated
+/// cannot take the foreground from under whatever the user is doing: there is no
+/// flash left to be quick enough to catch.
+fn suppress(hwnd: HWND) {
+    unsafe {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        if ex & WS_EX_NOACTIVATE.0 == 0 {
+            let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | WS_EX_NOACTIVATE.0) as isize);
+        }
+        cloak(hwnd, true);
+        let _ = ShowWindow(hwnd, SW_HIDE);
+    }
+}
+
+/// Give back what `suppress` took away, for a window that turns out to be a shell
+/// someone is meant to use.
+fn unsuppress(hwnd: HWND) {
+    unsafe {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        if ex & WS_EX_NOACTIVATE.0 != 0 {
+            let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_NOACTIVATE.0) as isize);
+        }
+    }
+    cloak(hwnd, false);
+}
+
+/// `DWMWA_CLOAK`: the DWM stops compositing the window entirely, whatever the
+/// window itself believes about being visible.
+fn cloak(hwnd: HWND, on: bool) {
+    let value: i32 = on.into();
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAK,
+            &value as *const i32 as *const c_void,
+            std::mem::size_of::<i32>() as u32,
+        );
+    }
 }
 
 /// What a pending window's title says it is.
