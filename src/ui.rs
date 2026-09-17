@@ -44,7 +44,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_SPACE, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DefWindowProcW, DestroyWindow,
+    AdjustWindowRectEx, CreateWindowExW, CW_USEDEFAULT, DI_NORMAL, DefWindowProcW, DestroyWindow,
+    DrawIconEx,
     GetClientRect, GetCursorPos, IDC_ARROW, IDC_HAND, LoadCursorW, MINMAXINFO, RegisterClassW,
     SetCursor, SetForegroundWindow, SetWindowPos, ShowWindow, SW_HIDE, SW_SHOWNORMAL,
     SWP_NOACTIVATE, SWP_NOZORDER, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND,
@@ -53,6 +54,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::app::{self, Snapshot};
+use crate::icon;
 use crate::theme::{self, Fonts, Palette, Rgb};
 use crate::update;
 use crate::win::{instance, pcw, wide};
@@ -86,19 +88,26 @@ const TOGGLE_H: i32 = 36;
 /// The quit button, in the right corner of the footer.
 const QUIT_W: i32 = 88;
 const QUIT_H: i32 = 28;
-const QUIT_TOP: i32 = 288;
+/// Both plates stand *above* the footer rule, so the footer line keeps its own
+/// baseline: a control level with a line of small print reads as loose type
+/// rather than as a button.
+const QUIT_TOP: i32 = 250;
 
 /// The update control, to its left, in the space the log hint used to take. The
 /// log is reachable from the tray menu; this is the only control that asks the
 /// network anything, and the widest its label ever gets is `CHECK FOR UPDATES`.
 const UPDATE_W: i32 = 176;
 const UPDATE_H: i32 = 28;
-const UPDATE_TOP: i32 = 288;
+const UPDATE_TOP: i32 = 250;
 
-/// The quit button sits under the footer rule and inside the sheet. Both are
-/// constants, so this is settled at compile time rather than at run time.
+/// The plates sit clear of the small print above them and of the footer rule
+/// below. All of it is constant, so this is settled at compile time.
 const _: () = {
-    assert!(QUIT_TOP > 284, "the quit button would start above the footer rule");
+    assert!(
+        QUIT_TOP + QUIT_H <= 284,
+        "the plates would cross into the footer"
+    );
+    assert!(QUIT_TOP >= 246, "the plates would crowd the small print");
     assert!(
         QUIT_TOP + QUIT_H <= H - PAD / 2,
         "the quit button would fall off the sheet"
@@ -527,21 +536,6 @@ fn update_rect(s: f32) -> RECT {
     }
 }
 
-/// The ring the keyboard leaves on whatever it is pointing at, drawn just
-/// outside the control so it never covers the control's own outline.
-fn focus_ring(p: &Painter, r: RECT, pal: &Palette) {
-    let ring = p.d(4.0);
-    p.frame(
-        RECT {
-            left: r.left - ring,
-            top: r.top - ring,
-            right: r.right + ring,
-            bottom: r.bottom + ring,
-        },
-        pal.dim,
-    );
-}
-
 fn draw_autostart(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &Ui) {
     p.text(
         "START WITH WINDOWS",
@@ -603,10 +597,6 @@ fn draw_autostart(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui
         p.round(knob, d / 2, c, down.then_some(c));
     }
 
-    if ui.focus == Some(Control::Autostart) {
-        focus_ring(p, r, pal);
-    }
-
     // The operator's tick: they armed this one.
     let wx = r.right + p.d(14.0);
     if on {
@@ -646,10 +636,6 @@ fn draw_quit(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui) {
     } else {
         p.round(r, p.d(4.0), if hot { pal.ink } else { pal.body }, None);
     }
-    if ui.focus == Some(Control::Quit) {
-        focus_ring(p, r, pal);
-    }
-
     let ink = if down {
         pal.ground
     } else if hot {
@@ -687,10 +673,6 @@ fn draw_update(p: &Painter, pal: &Palette, fonts: &Fonts, ui: &Ui, snap: &Snapsh
     } else {
         p.round(r, p.d(4.0), if hot { pal.ink } else { pal.body }, None);
     }
-    if ui.focus == Some(Control::Update) {
-        focus_ring(p, r, pal);
-    }
-
     let ink = if down {
         pal.ground
     } else if hot {
@@ -734,7 +716,35 @@ fn update_label(state: &update::State) -> String {
 fn draw_sheet(p: &Painter, pal: &Palette, snap: &Snapshot, fonts: &Fonts, ui: &Ui) {
     let left = p.d(PAD as f32);
 
-    p.text("Ternitor", left, p.d(20.0), fonts.title, pal.ink, 0.0);
+    // The mark in the corner, with the name standing beside it: the surface is a
+    // plate, and a plate carries its maker's stamp.
+    let mark = p.d(36.0);
+    let icon = icon::hicon(mark);
+    if !icon.is_invalid() {
+        unsafe {
+            let _ = DrawIconEx(
+                p.hdc,
+                left,
+                p.d(20.0),
+                icon,
+                mark,
+                mark,
+                0,
+                None,
+                DI_NORMAL,
+            );
+        }
+        icon::destroy(icon);
+    }
+
+    p.text(
+        "Ternitor",
+        left + p.d(48.0),
+        p.d(20.0),
+        fonts.title,
+        pal.ink,
+        0.0,
+    );
     for (i, line) in [
         "Hides the blank console windows Windows opens for processes that",
         "have no console of their own \u{2014} hidden the instant they appear,",
