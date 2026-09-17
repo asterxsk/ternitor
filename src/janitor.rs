@@ -457,7 +457,8 @@ fn is_unwanted(hwnd: HWND) -> bool {
 enum Verdict {
     /// No title yet, or still Windows Terminal's placeholder.
     Undecided,
-    /// A blank console: the OS-assigned name of the executable and nothing more.
+    /// A blank console: the executable the client is, or the command line it was
+    /// started with. Text the spawner wrote, not a person.
     StayHidden,
     /// Something a person asked for, which has to be given back.
     Restore,
@@ -466,7 +467,7 @@ enum Verdict {
 fn classify(title: &str) -> Verdict {
     if is_undecided_title(title) {
         Verdict::Undecided
-    } else if is_bare_exe_path(title) {
+    } else if is_bare_exe_path(title) || is_command_line(title) {
         Verdict::StayHidden
     } else {
         Verdict::Restore
@@ -487,6 +488,27 @@ fn is_bare_exe_path(title: &str) -> bool {
         && b[0].is_ascii_alphabetic()
         && b[1] == b':'
         && (b[2] == b'\\' || b[2] == b'/')
+}
+
+/// The client's own command line, which stands in the title until the client
+/// names itself: a path to an exe, then a space and the arguments. Windows
+/// Terminal shows exactly this for a console started with arguments, so an
+/// `npm update -g cline` window arrives titled with the whole node command line
+/// -- readable as "a person asked for this" by every other rule here, which is
+/// how one of them got away.
+fn is_command_line(title: &str) -> bool {
+    // Quoted, as the shell writes a path with a space in it:
+    // `"C:\Program Files\nodejs\node.exe" ...`.
+    if let Some(quoted) = title.strip_prefix('"') {
+        if let Some(end) = quoted.find('"') {
+            return is_bare_exe_path(&quoted[..end]);
+        }
+    }
+
+    match title.find(char::is_whitespace) {
+        Some(space) => is_bare_exe_path(title[..space].trim_end()),
+        None => false,
+    }
 }
 
 /// Case-insensitive, and allocation-free: this runs for every window that is
@@ -646,6 +668,35 @@ mod tests {
         assert!(!is_bare_exe_path("C:"));
         assert!(!is_bare_exe_path(""));
         assert!(!is_bare_exe_path(".exe"));
+    }
+
+    /// A client started with arguments is titled with its whole command line
+    /// until it names itself. That is the spawner's text -- the npm window that
+    /// got away on 2026-09-17 -- and not something a person wrote.
+    #[test]
+    fn client_command_lines_stay_hidden() {
+        for title in [
+            r#""C:\Program Files\nodejs\node.exe" "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" update -g cline --tag latest"#,
+            r"C:\Windows\System32\cmd.exe /d /s /c npm update -g cline",
+            r#""C:\Program Files\Git\cmd\git.exe" fetch --all"#,
+        ] {
+            assert_eq!(classify(title), Verdict::StayHidden, "{title}");
+        }
+    }
+
+    #[test]
+    fn a_command_line_is_a_path_and_then_something() {
+        assert!(is_command_line(
+            r#""C:\Program Files\nodejs\node.exe" "C:\x\npm-cli.js" update"#
+        ));
+        assert!(is_command_line(r"C:\Windows\System32\cmd.exe /c dir"));
+        // A path on its own belongs to the rule above, and a title that merely
+        // reads like a sentence is a shell.
+        assert!(!is_command_line(r"C:\Windows\System32\cmd.exe"));
+        assert!(!is_command_line(r"Administrator: C:\Windows\System32\cmd.exe"));
+        assert!(!is_command_line("pwsh - node"));
+        assert!(!is_command_line(r#""C:\Windows\System32" cmd"#));
+        assert!(!is_command_line(""));
     }
 
     #[test]
