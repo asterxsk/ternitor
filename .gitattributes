@@ -1,0 +1,6 @@
+# The committed icon is compared byte-for-byte against the geometry in
+# src/mark.rs (`mark::tests::the_committed_svg_matches_the_geometry`), so it has
+# to be checked out exactly as it was committed. Without this, a Windows
+# checkout with `core.autocrlf=true` rewrites its line endings and the test
+# fails on a file nobody touched.
+assets/icon.svg text eol=lf
