@@ -1,0 +1,210 @@
+name: Release
+
+# Tag-driven: `git tag v1.2.0 && git push origin main v1.2.0` is the whole
+# release procedure. There is no `workflow_dispatch`, because a manual run has
+# no tag to name itself after and `--verify-tag` would refuse it; re-running a
+# failed release is `gh run rerun`.
+#
+# ONE TARGET BUILDS: Ternitor is a Windows program by construction. The matrix
+# below has a single row and the other two are written down here rather than as
+# entries, because a job that exists and does nothing shows a green tick that
+# means nothing. The blockers for macOS and Linux are:
+#
+#   - `windows` is an unconditional dependency, and src/janitor.rs, ui.rs,
+#     tray.rs, icon.rs, theme.rs and win.rs are raw Win32: there is no platform
+#     abstraction and there is not meant to be one. The windows Ternitor hides
+#     are made by Windows.
+#   - build.rs compiles the icon and version block into the exe with
+#     `winresource`, which needs rc.exe from the Windows SDK.
+#   - The defect itself does not exist there: nothing on Linux or macOS opens a
+#     terminal behind the user's back, so there is no honest resident process to
+#     ship. That decision is recorded in PRODUCT.md.
+#
+# When a port lands, adding its row to `strategy.matrix.include` is the whole
+# change here, and autostart for the new platform goes in src/autostart.rs:
+# a LaunchAgent plist on macOS (~/Library/LaunchAgents/com.asterxsk.ternitor.plist,
+# loaded with `launchctl bootstrap gui/$UID`), and an XDG autostart entry on
+# Linux (~/.config/autostart/ternitor.desktop). Neither is written today,
+# because neither has a binary to start.
+on:
+  push:
+    tags: ["v*"]
+
+# The default token is read-only. Publishing a release needs write, and nothing
+# else here needs anything at all.
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    name: the tag and Cargo.toml agree
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.manifest.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: the tag has to be checked against main, and a shallow
+          # clone has no `origin/main` to check it against.
+          fetch-depth: 0
+
+      # The tag and the manifest are two places that both claim a version. If
+      # they disagree, the release ships a binary that reports a different
+      # version from the one it was released under, and the in-app update check
+      # -- which reads this same manifest on main -- then offers it forever:
+      # every launch sees a newer version on github and a binary that still
+      # calls itself old. Cheaper to refuse the tag.
+      - name: Read the version and check it against the tag
+        id: manifest
+        shell: pwsh
+        run: |
+          $version = $null
+          $inPackage = $false
+          foreach ($line in Get-Content Cargo.toml) {
+            if ($line -match '^\s*\[') {
+              $inPackage = $line.Trim() -eq '[package]'
+              continue
+            }
+            if ($inPackage -and $line -match '^\s*version\s*=\s*"([^"]+)"') {
+              $version = $Matches[1]
+              break
+            }
+          }
+          if (-not $version) { throw 'no version found under [package]' }
+
+          $tag = '${{ github.ref_name }}'.TrimStart('v')
+          if ($tag -ne $version) {
+            throw "tag v$tag does not match the version in Cargo.toml ($version)"
+          }
+          # The update check reads Cargo.toml on main, so a tag that is not on
+          # main would publish a version no running copy can discover.
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "the tagged commit is not on main; the in-app update check reads main's Cargo.toml"
+          }
+          Write-Host "releasing $version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+  build:
+    name: build and package
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Tests
+        run: cargo test --locked
+
+      - name: Build
+        run: cargo build --release --locked
+
+      # The binary is read, not assumed: a console subsystem here would mean the
+      # app flashes a console of its own at logon.
+      - name: The binary can never open a console
+        shell: pwsh
+        run: |
+          function Get-PeSubsystem([string]$Path) {
+            $fs = [System.IO.File]::OpenRead($Path)
+            try {
+              $reader = [System.IO.BinaryReader]::new($fs)
+              $fs.Position = 0x3C
+              $peOffset = $reader.ReadInt32()
+              if ($peOffset -le 0 -or $peOffset -ge $fs.Length) { throw "not a PE file: $Path" }
+              $fs.Position = $peOffset + 0x5C
+              $reader.ReadUInt16()
+            } finally {
+              $fs.Dispose()
+            }
+          }
+
+          $exe = 'target/release/ternitor.exe'
+          if ((Get-PeSubsystem $exe) -ne 2) {
+            throw "$exe is not PE subsystem 2 (GUI)"
+          }
+
+      # The installer takes the version and the icon off the built exe, so
+      # neither can drift from what it ships. Inno Setup 6 is on the runner
+      # image; see installer/README-style notes in build.ps1 for the rest.
+      - name: Installer
+        shell: pwsh
+        run: |
+          ./installer/build.ps1 -Exe target/release/ternitor.exe -Out dist/Ternitor-Setup.exe
+
+      - name: Stage the release
+        shell: pwsh
+        run: |
+          $version = '${{ needs.version.outputs.version }}'
+          New-Item -ItemType Directory -Force staging | Out-Null
+          Copy-Item target/release/ternitor.exe "staging/Ternitor-$version.exe"
+          Copy-Item dist/Ternitor-Setup.exe   "staging/Ternitor-Setup-$version.exe"
+
+          # A digest per file, published beside them. The filenames match the
+          # assets exactly, so the sums can be checked after download.
+          $names = @("Ternitor-$version.exe", "Ternitor-Setup-$version.exe")
+          $lines = $names | ForEach-Object {
+            "$((Get-FileHash "staging/$_" -Algorithm SHA256).Hash.ToLower())  $_"
+          }
+          [IO.File]::WriteAllText("$PWD/staging/SHA256SUMS", ($lines -join "`n") + "`n")
+          Get-Content staging/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ternitor-windows
+          path: staging/*
+          if-no-files-found: error
+
+  publish:
+    name: publish the release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      # `gh release create` reads the repository out of the checkout it is
+      # standing in, `--verify-tag` needs the tag to be in it, and
+      # `--generate-notes` needs the history back to the previous tag -- which a
+      # shallow clone does not have.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: What will be published
+        run: ls -l artifacts
+
+      # The release is the last step and it is the only one that cannot be
+      # undone by re-running a job: it is here so that a build that fails
+      # halfway leaves no half-populated release behind.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version='${{ needs.version.outputs.version }}'
+          # Named one by one rather than as a glob: `*.exe` would work today
+          # and would quietly start uploading whatever else matches tomorrow.
+          assets=(
+            "artifacts/Ternitor-$version.exe"
+            "artifacts/Ternitor-Setup-$version.exe"
+            "artifacts/SHA256SUMS"
+          )
+          for asset in "${assets[@]}"; do
+            if [ ! -f "$asset" ]; then
+              echo "missing $asset" >&2
+              exit 1
+            fi
+          done
+          gh release create '${{ github.ref_name }}' \
+            --title 'Ternitor ${{ github.ref_name }}' \
+            --generate-notes \
+            --verify-tag \
+            "${assets[@]}"

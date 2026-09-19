@@ -551,8 +551,8 @@ fn classify(title: &str) -> Verdict {
         Verdict::Undecided
     } else if is_bare_exe_path(title) || is_command_line(title) {
         // The broker's and the spawner's own text, and it wins over everything
-        // below: an `Administrator: ...` prefix is the one shell title that
-        // starts with a path, and it is caught by name before this.
+        // below: a title that is a path is a program talking, whether or not an
+        // `Administrator: ` prefix has been added to it since.
         Verdict::StayHidden
     } else if is_shell_title(title) {
         Verdict::Restore
@@ -582,17 +582,29 @@ const SHELL_NAMES: &[&str] = &[
 ///
 /// The net is deliberately narrow. A shell in a handoff window is what this
 /// exists for, and the shapes below are the ones that only a shell produces: a
-/// directory it is sitting in, a prompt, an elevated console, or the shell's own
-/// name. A program's name -- `npm`, `cargo`, the title npm sets to its own
-/// command line -- is not one of them.
+/// directory it is sitting in, a prompt, or the shell's own name. A program's
+/// name -- `npm`, `cargo`, the title npm sets to its own command line -- is not
+/// one of them.
 fn is_shell_title(title: &str) -> bool {
     let title = title.trim();
     let first = title.split_whitespace().next().unwrap_or("");
 
-    // An elevated console says so, whatever is running inside it.
-    title.starts_with("Administrator: ")
-        // The directory a shell is sitting in, and nothing besides.
-        || is_directory_path(title)
+    // An elevated console says so, and what follows the prefix decides.
+    // A shell a person elevated names itself (`Administrator: Windows
+    // PowerShell`) or says where it is. A console started hidden by a
+    // launcher is titled with the executable it runs (`Administrator:
+    // C:\...\powershell.exe`) -- the client's own text, the very thing the
+    // window was hidden for, and elevation does not make it a person's shell.
+    // Measured on this machine: the UAC-elevated shell reads
+    // `Administrator: Windows PowerShell`; the hidden logon launcher reads
+    // `Administrator: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe`
+    // and used to be given back 600ms later as a flash.
+    if let Some(rest) = title.strip_prefix("Administrator: ") {
+        return is_shell_title(rest);
+    }
+
+    // The directory a shell is sitting in, and nothing besides.
+    is_directory_path(title)
         // `user@host:~`, `user@host:/mnt/c/Users`: a prompt.
         || is_prompt(title)
         // A shell by name, and with its own arguments after it: `pwsh - node`.
@@ -797,7 +809,10 @@ mod tests {
     fn real_shell_titles_are_given_back() {
         for title in [
             "Command Prompt",
-            r"Administrator: C:\Windows\System32\cmd.exe",
+            r"Administrator: Windows PowerShell",
+            r"Administrator: Command Prompt",
+            r"Administrator: C:\Users\asterxsk",
+            r"Administrator: asterxsk@desktop:/mnt/c",
             r"pwsh - node",
             r"C:\Windows\System32",
             r"C:\",
@@ -810,6 +825,21 @@ mod tests {
             "PowerShell 7 (x64)",
         ] {
             assert_eq!(classify(title), Verdict::Restore, "{title}");
+        }
+    }
+
+    /// The flash at logon on 2026-09-19: the cua-driver scheduled task starts a
+    /// hidden elevated PowerShell, and its console is titled with the executable
+    /// it runs. That is the client's own text with an elevation prefix, not a
+    /// shell a person asked for, and it must stay hidden.
+    #[test]
+    fn hidden_launcher_consoles_stay_hidden_even_elevated() {
+        for title in [
+            r"Administrator: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe",
+            r"Administrator: C:\Windows\System32\cmd.exe",
+            r#"Administrator: "C:\Program Files\PowerShell\7\pwsh.exe" -NoProfile -Command x"#,
+        ] {
+            assert_eq!(classify(title), Verdict::StayHidden, "{title}");
         }
     }
 
@@ -894,7 +924,9 @@ mod tests {
         assert!(!is_prompt(""));
 
         assert!(is_shell_title("asterxsk@desktop:~"));
-        assert!(is_shell_title("Administrator: C:\\Windows\\System32\\cmd.exe"));
+        assert!(is_shell_title("Administrator: Windows PowerShell"));
+        assert!(is_shell_title("Administrator: C:\\Users\\asterxsk"));
+        assert!(!is_shell_title("Administrator: C:\\Windows\\System32\\cmd.exe"));
         assert!(!is_shell_title("npm"));
         assert!(!is_shell_title("npm update cline"));
         assert!(!is_shell_title(""));

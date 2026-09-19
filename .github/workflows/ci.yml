@@ -1,0 +1,65 @@
+name: CI
+
+# Every push to main and every pull request: tests, a release build, and the
+# one property that must never regress -- the binary is GUI-subsystem, so it can
+# never allocate a console and therefore can never flash one of its own at
+# logon. A release is a tag; see release.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only: nothing here writes to the repository.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: build and test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Tests
+        run: cargo test --locked
+
+      - name: Release build
+        run: cargo build --release --locked
+
+      # `windows_subsystem = "windows"` (src/main.rs) is a cfg_attr on
+      # `not(debug_assertions)`, so it is a property of the release profile and
+      # nothing in a `cargo test` run can check it. The PE header can.
+      #
+      # Subsystem 2 = GUI, 3 = console. This is the difference between an app
+      # that hides consoles and an app that flashes one of its own at every
+      # logon, and it is read from the bytes that ship, not from the source.
+      - name: The binary can never open a console
+        shell: pwsh
+        run: |
+          function Get-PeSubsystem([string]$Path) {
+            $fs = [System.IO.File]::OpenRead($Path)
+            try {
+              $reader = [System.IO.BinaryReader]::new($fs)
+              $fs.Position = 0x3C
+              $peOffset = $reader.ReadInt32()
+              if ($peOffset -le 0 -or $peOffset -ge $fs.Length) { throw "not a PE file: $Path" }
+              $fs.Position = $peOffset + 0x5C
+              $reader.ReadUInt16()
+            } finally {
+              $fs.Dispose()
+            }
+          }
+
+          $exe = 'target/release/ternitor.exe'
+          $subsystem = Get-PeSubsystem $exe
+          if ($subsystem -ne 2) {
+            throw "$exe is PE subsystem $subsystem; a console (3) could flash at logon"
+          }
+          Write-Host "$exe is PE subsystem 2 (GUI), as required"

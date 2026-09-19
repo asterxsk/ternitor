@@ -77,7 +77,7 @@ shortcut, the `Run` value and that entry — through the installer's own uninsta
 |---|---|
 | **Never drawn** | The window is suppressed the moment it exists — cloaked by the compositor, forbidden to activate, and hidden — so a console nobody asked for is never on screen, not even for one frame |
 | **Takes the focus back** | Whatever takes the foreground anyway — Windows Terminal wakes its handoff window again as the client attaches, seconds later — is hidden again and the foreground handed back to the window that last really had it |
-| **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked 600ms in and given back, without activation, only when its title is a shell's own — a directory it is sitting in, a prompt, an elevated console, or a shell by name. `npm` naming itself is not one |
+| **Knows the difference** | A terminal *you* opened from `Win+R` or a `wt` alias looks identical at that instant. Each hide is re-checked 600ms in and given back, without activation, only when its title is a shell's own — a directory it is sitting in, a prompt, or a shell by name, elevated or not. `npm` naming itself is not one |
 | **Counts its work** | The settings screen carries a live count of what it has hidden this session, and the title of the last one |
 | **Refuses to grow** | Five things on the settings screen and nothing else — a switch, the counter, an update check, app info, and a way out. Everything that is not one of those lives on the tray menu |
 | **Asks once, when asked** | One request exists in the whole binary, behind **Check for updates**. No telemetry, no analytics, no crash reporting, and nothing checked on a schedule |
@@ -142,7 +142,11 @@ the count is the whole of what Ternitor produces.
   which you can skip.
 - **Windows only.** The windows it hides are made by Windows, and `janitor.rs` has nothing to port:
   the detection is Windows' own window classes and the broker's `-Embedding` flag. Nothing here builds
-  for Linux or macOS.
+  for Linux or macOS, and the release workflow keeps those two build rows written down beside the
+  exact reasons they cannot run today. A port would also give `src/autostart.rs` a second and third
+  mechanism: a LaunchAgent plist on macOS (`~/Library/LaunchAgents/com.asterxsk.ternitor.plist`,
+  loaded with `launchctl bootstrap gui/$UID`) and an XDG autostart entry on Linux
+  (`~/.config/autostart/ternitor.desktop`). Neither is written, because there is no binary to start.
 - **567 KB.** One exe, most of it the icon. Nothing is written outside its own folder and the
   registry values you can see and delete.
 - **Nothing at startup.** The build is a GUI-subsystem binary (PE subsystem 2), so it can never
@@ -186,6 +190,27 @@ copy target\release\ternitor.exe .\ternitor.exe
 ```
 
 That writes `Ternitor-Setup.exe` beside it.
+
+### Release process
+
+Releases are tags, and the tag has to name the version that is already on `main` — the in-app update
+check reads `Cargo.toml` from `main`, so a tag anywhere else publishes a version no running copy can
+discover:
+
+```
+# 1. Move the version in Cargo.toml.
+git commit -am "Release 1.1.1"
+git tag v1.1.1
+git push origin main v1.1.1
+```
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) then checks the tag against
+`Cargo.toml`, runs the tests, builds the exe, **reads the PE header of the built binary to prove it
+is subsystem 2 (GUI)** — the property that stops it flashing a console of its own at logon — builds
+the installer, writes `SHA256SUMS`, and publishes a GitHub Release with `Ternitor-<version>.exe`,
+`Ternitor-Setup-<version>.exe` and the sums. Pushes to `main` run
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml): the same tests, build and subsystem check,
+with no release.
 
 ## Files
 
